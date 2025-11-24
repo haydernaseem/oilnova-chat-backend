@@ -1,24 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import groq
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-# API Key مالك
-client = groq.Client(api_key="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")
+client = groq.Client(api_key=os.environ.get("GROQ_API_KEY"))
 
 SYSTEM_PROMPT = """
 You are OILNOVA Chat-AI — a bilingual (Arabic + English) petroleum engineering assistant.
-You ONLY answer questions related to:
-ESP, artificial lift, reservoir engineering, drilling, production, logging, data analysis.
-
-If the user writes Arabic → reply Arabic.
-If English → reply English.
-
-Respond clearly, technically, and concisely.
-
-If question is outside petroleum engineering → politely decline.
+You ONLY answer questions related to ESP, reservoir, drilling, production, logs, data analysis.
 """
 
 @app.route("/chat", methods=["POST"])
@@ -38,7 +30,9 @@ def chat():
             ]
         )
 
-        reply = completion.choices[0].message["content"]
+        # 👇 هنا التعديل المهم
+        reply = completion.choices[0].message.content
+
         return jsonify({"reply": reply})
 
     except Exception as e:
@@ -47,5 +41,4 @@ def chat():
 
 
 if __name__ == "__main__":
-    # مهم حتى يشتغل على Render
     app.run(host="0.0.0.0", port=5000)
