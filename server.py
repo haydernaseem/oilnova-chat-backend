@@ -1,75 +1,76 @@
-from flask import Flask, request, Response
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import groq
 import os
+from groq import Groq
 
 app = Flask(__name__)
-CORS(app)
 
-client = groq.Client(api_key=os.environ.get("GROQ_API_KEY"))
+# ====== CORS FIX 100% ======
+CORS(app, resources={
+    r"/*": {
+        "origins": ["https://petroai-iq.web.app", "*"],
+        "methods": ["POST", "GET", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
-SYSTEM_PROMPT = """
-You are OILNOVA Chat-AI, a bilingual petroleum engineering assistant developed for the OILNOVA platform.
+# ====== Groq Client ======
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-========================
-PRIMARY FUNCTION:
-- You ONLY answer questions related to petroleum engineering:
-  ESP, PCP, artificial lift, reservoir engineering, drilling, completions, well testing,
-  production operations, logging, EOR/IOR, petroleum data analysis.
-- If the user writes in Arabic → reply in Arabic.
-- If the user writes in English → reply in English.
-- If Arabic message contains English technical terms → keep English terms clean & formatted
-  (no broken text, no mixed encoding), and explain them in Arabic naturally.
-- Reject any unrelated questions politely.
+FOUNDERS_INFO = {
+    "founder": "مؤسس منصة OILNOVA هو المهندس حيدر نسيم السامرائي — مهندس نفط، مبرمج، وصانع محتوى من سامراء. "
+               "تخرّج من جامعة كركوك / كلية الهندسة / قسم النفط سنة 2025 بتقدير جيد جدًا.",
 
-========================
-ABOUT THE PLATFORM (OILNOVA):
-Founder:
-- **Hayder Naseem Al-Samarrai**
-  Petroleum Engineer, programmer, AI developer, and content creator from Samarra – Iraq.
-  Graduate of University of Kirkuk, College of Engineering, Petroleum Engineering Department,
-  class of 2025 (Very Good).
+    "ali": "علي بلال — خريج هندسة نفط من جامعة الموصل، دفعة 2025، بتقدير جيد.",
+    "noor": "نور كنعان — خريجة هندسة نفط من الموصل، كردية، دفعة 2025، بتقدير جيد.",
+    "arzo": "أرزو متين — تركمانية من كركوك، خريجة هندسة نفط دفعة 2025 بتقدير جيد."
+}
 
-Assisting Team:
-- **Ali Bilal** – Petroleum Engineer, class of 2025 (Mosul).
-- **Noor Kanaan** – Petroleum Engineer, class of 2025 (Mosul).
-- **Arzu Mateen** – Petroleum Engineer, class of 2025 (Kirkuk).
-
-Rules:
-- If user asks: “Who founded OILNOVA?” → Answer:
-  “The founder of OILNOVA is Hayder Naseem Al-Samarrai.”
-- If asked about any team member → mention role only.
-- Do NOT disclose private/personal information.
-- Tone: Professional, friendly, clear, technical.
-
-========================
-"""
+@app.route("/")
+def home():
+    return "OILNOVA CHAT BACKEND IS RUNNING OK"
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_message = data.get("message", "")
+    try:
+        user_msg = request.json.get("message", "")
 
-    def stream_response():
-        stream = client.chat.completions.create(
+        # ردود خاصة بفريق المنصة
+        msg_lower = user_msg.lower()
+
+        if "منو مؤسس" in user_msg or "المؤسس" in user_msg or "founder" in msg_lower:
+            return jsonify({"reply": FOUNDERS_INFO["founder"]})
+
+        if "علي بلال" in user_msg or "ali" in msg_lower:
+            return jsonify({"reply": FOUNDERS_INFO["ali"]})
+
+        if "نور" in user_msg or "noor" in msg_lower:
+            return jsonify({"reply": FOUNDERS_INFO["noor"]})
+
+        if "ارزو" in user_msg or "arzo" in msg_lower:
+            return jsonify({"reply": FOUNDERS_INFO["arzo"]})
+
+        # ====== AI COMPLETION ======
+        completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message}
-            ],
-            stream=True
+                {
+                    "role": "system",
+                    "content": (
+                        "You are OILNOVA AI Assistant. Answer ONLY petroleum engineering questions "
+                        "or questions about the OILNOVA platform team."
+                    )
+                },
+                {"role": "user", "content": user_msg}
+            ]
         )
 
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+        reply = completion.choices[0].message.content
+        return jsonify({"reply": reply})
 
-    return Response(stream_response(), mimetype="text/plain")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-
-@app.route("/", methods=["GET"])
-def root():
-    return "OILNOVA Chat AI Backend is running."
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=10000)
