@@ -100,7 +100,7 @@ def chat():
         conversation_history = session_data['messages']
 
         # ====== SYSTEM PROMPT المحسن ======
-        SYSTEM_PROMPT = """
+        system_prompt = """
 You are OILNOVA Chat-AI — a specialized bilingual (Arabic/English) petroleum engineering assistant.
 
 STRICT LANGUAGE RULES:
