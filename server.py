@@ -4,6 +4,7 @@ import os
 from groq import Groq
 import uuid
 from datetime import datetime, timedelta
+import re
 
 app = Flask(__name__)
 
@@ -22,10 +23,81 @@ client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 # ====== تخزين المحادثات ======
 conversations = {}
 
+# ====== معلومات الفريق المحسنة ======
 FOUNDERS_INFO = {
-    "founder": "مؤسس منصة OILNOVA هو المهندس حيدر نسيم السامرائي — مهندس نفط، مبرمج، وصانع محتوى من سامراء. "
-               "تخرّج من جامعة كركوك / كلية الهندسة / قسم النفط سنة 2025 بتقدير جيد جدًا. "
-               "أسس منصة أويل نوفا وهي أول منصة عربية في مجال النفط تستخدم تقنيات الذكاء الاصطناعي.",
+    "hayder": {
+        "arabic": """المهندس حيدر نسيم السامرائي - مؤسس منصة OILNOVA
+• مهندس نفط، محلل بيانات، مبرمج فرونت إند و Firebase باك إند
+• خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط 2025
+• من عشيرة السادة البنيسان الحسنية في سامراء
+• أسس أويل نوفا كأول منصة عربية نفطية تستخدم الذكاء الاصطناعي
+
+للتواصل: haydernaseem02@gmail.com""",
+        
+        "english": """Engineer Hayder Naseem Al-Samarrai - Founder of OILNOVA Platform
+• Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer
+• Graduate of Kirkuk University / College of Engineering / Petroleum Engineering Dept. 2025
+• Descendant of Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra
+• Founded OILNOVA as the first Arabic oil platform using AI technologies
+
+Contact: haydernaseem02@gmail.com"""
+    },
+    
+    "ali": {
+        "arabic": """علي بلال عبدالله خلف
+• مبرمج بايثون وشغوف بمجال التكنولوجيا
+• من مدينة الموصل / ناحية زمار / عشيرة الجبور
+• مواليد 2001
+• خريج هندسة نفط
+
+للتواصل: ali.bilalabdullahkhalaf@gmail.com""",
+        
+        "english": """Ali Bilal Abdullah Khalaf
+• Python Programmer passionate about technology
+• From Mosul City / Al-Zumar District / Al-Jubour Tribe
+• Born 2001
+• Petroleum Engineering Graduate
+
+Contact: ali.bilalabdullahkhalaf@gmail.com"""
+    },
+    
+    "noor": {
+        "arabic": """نور كنعان حيدر
+• مبرمجة بايثون وشغوفة بمجال التكنولوجيا
+• كردية من كركوك
+• مواليد 2004
+• خريجة هندسة نفط - جامعة كركوك 2025
+• مستقبل مهني مشرق في مجال البرمجة
+
+للتواصل: noorkanaanhaider@gmail.com""",
+        
+        "english": """Noor Kanaan Haider
+• Python Programmer passionate about technology
+• Kurdish from Kirkuk
+• Born 2004
+• Petroleum Engineering Graduate - Kirkuk University 2025
+• Promising professional future in programming field
+
+Contact: noorkanaanhaider@gmail.com"""
+    },
+    
+    "arzo": {
+        "arabic": """أرزو متين
+• تركمانية من كركوك مواليد 2004
+• محللة بيانات ومبرمجة بايثون
+• شغوفة بالتكنولوجيا ومؤسسة مشاركة لمنصة أويل نوفا
+• مستقبل مهني كبير متوقع في مجال تحليل البيانات
+
+للتواصل: engarzo699@gmail.com""",
+        
+        "english": """Arzu Metin
+• Turkmen from Kirkuk, born 2004
+• Data Analyst and Python Programmer
+• Technology enthusiast and co-founder of OILNOVA platform
+• Expected significant professional future in data analysis
+
+Contact: engarzo699@gmail.com"""
+    }
 }
 
 # ====== تنظيف المحادثات القديمة ======
@@ -63,9 +135,43 @@ def add_message_to_history(session_id, role, content):
     if len(session['messages']) > 12:
         session['messages'] = session['messages'][-12:]
 
+def detect_language(text):
+    """كشف لغة النص بدقة"""
+    arabic_chars = len(re.findall(r'[\u0600-\u06FF]', text))
+    english_chars = len(re.findall(r'[a-zA-Z]', text))
+    
+    if arabic_chars > english_chars:
+        return 'arabic'
+    elif english_chars > arabic_chars:
+        return 'english'
+    else:
+        # إذا كانت متساوية، ننظر إلى الكلمات
+        arabic_words = len(re.findall(r'\b[\u0600-\u06FF]+\b', text))
+        english_words = len(re.findall(r'\b[a-zA-Z]+\b', text))
+        return 'arabic' if arabic_words >= english_words else 'english'
+
+def clean_response(text):
+    """تنظيف الرد من الأحرف العشوائية والمشاكل النصية"""
+    # إزالة الأحرف غير المرغوب فيها
+    cleaned = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\]', '', text)
+    
+    # إصلاح المسافات الزائدة
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    # تأكد من أن النص يبدأ بحرف مناسب
+    cleaned = cleaned.strip()
+    
+    return cleaned
+
+def get_founder_info(founder_key, user_language):
+    """الحصول على معلومات المؤسس باللغة المناسبة"""
+    if founder_key in FOUNDERS_INFO:
+        return FOUNDERS_INFO[founder_key].get(user_language, FOUNDERS_INFO[founder_key]['arabic'])
+    return "لم يتم العثور على المعلومات المطلوبة."
+
 @app.route("/")
 def home():
-    return "OILNOVA CHAT BACKEND IS RUNNING OK - ENHANCED VERSION"
+    return "OILNOVA CHAT BACKEND IS RUNNING OK - ENHANCED PROFESSIONAL VERSION"
 
 @app.route("/start_session", methods=["GET"])
 def start_session():
@@ -91,87 +197,112 @@ def chat():
         # تنظيف المحادثات القديمة
         cleanup_old_conversations()
 
+        # كشف لغة المستخدم
+        user_language = detect_language(user_msg)
+        
         # استرجاع تاريخ المحادثة
         session_data = get_conversation_history(session_id)
         conversation_history = session_data['messages']
 
-        # ====== SYSTEM PROMPT المحسن ======
-        system_prompt = """
-You are OILNOVA Chat-AI — a specialized bilingual (Arabic/English) petroleum engineering assistant.
+        # ====== SYSTEM PROMPT المحسن والاحترافي ======
+        system_prompt_arabic = """
+أنت مساعد OILNOVA الذكي - مساعد متخصص في هندسة النفط والغاز.
 
-STRICT LANGUAGE RULES:
-- If user message is in Arabic → reply ONLY in Arabic
-- If user message is in English → reply ONLY in English  
-- Never mix languages in the same response
-- If technical terms must be used, provide Arabic translation in parentheses
+🎯 **التخصص الأساسي**: 
+- هندسة النفط والغاز بشكل حصري
+- أنظمة ESP والرفع الاصطناعي
+- هندسة المكامن والتنقيب
+- عمليات الحفر والإنتاج
+- التسجيل الجيوفيزيائي وتحليل البيانات النفطية
 
-TECHNICAL DOMAIN:
-You ONLY answer questions related to:
-- ESP systems and artificial lift
-- Reservoir engineering and simulation  
-- Drilling operations and technologies
-- Production optimization
-- Well logging and data analysis
-- Petroleum geology and geophysics
-- Oil field equipment and maintenance
+🌐 **قواعد اللغة الصارمة**:
+- إذا كان السؤال بالعربية → أجب بالعربية فقط
+- إذا كان السؤال بالإنجليزية → أجب بالإنجليزية فقط  
+- لا تخلط اللغات أبداً في الرد الواحد
+- إذا اضطررت لاستخدام مصطلح تقني إنجليزي، اكتبه ثم اشرحه بين قوسين
 
-PERSONAL INFORMATION (ONLY when specifically asked about team members):
+👥 **معلومات الفريق (فقط عند السؤال المباشر)**:
+- حيدر نسيم: مؤسس المنصة، مهندس نفط، مبرمج
+- علي بلال: مبرمج بايثون من الموصل
+- نور كنعان: مبرمجة بايثون من كركوك
+- أرزو متين: محللة بيانات ومبرمجة بايثون من كركوك
 
-Hayder Naseem:
-- Data Analyst, Frontend & Firebase Backend Developer
-- Descendant of Al-Benisian Al-Hasaniyah tribe in Samarra
-- Contact: haydernaseem02@gmail.com
-
-Ali Bilal: 
-- From Mosul, Al-Zumar district, Al-Jubour tribe, born 2001
-- Python programmer passionate about technology
-- Contact: ali.bilalabdullahkhalaf@gmail.com
-
-Noor Kanaan:
-- Kurdish from Kirkuk, born 2004
-- Python programmer, graduated from Kirkuk University 2025
-- Promising future in technology field
-- Contact: noorkanaanhaider@gmail.com
-
-Arzu Metin:
-- Turkmen from Kirkuk, born 2004
-- Technology enthusiast, Data Analyst, Python programmer
-- Co-founder of OILNOVA platform
-- Expected to have significant professional future
-- Contact: engarzo699@gmail.com
-
-STRICT RESPONSE POLICY:
-- For non-petroleum questions → "I specialize only in oil and gas engineering topics. For other inquiries, please contact the team members directly."
-- Maintain professional, clean formatting in responses
-- Never use mixed scripts or random characters
-- Ensure technical accuracy with clear explanations
-- For personal info → only provide when explicitly asked about specific team members
-- Keep responses structured and easy to read
+🚫 **السياسات**:
+- لا تعطي معلومات شخصية إلا عند السؤال المباشر عن أعضاء الفريق
+- للأسئلة خارج تخصص النفط: "أنا متخصص في هندسة النفط والغاز فقط"
+- حافظ على الاحترافية والدقة التقنية
+- رتب الردود بشكل منظم وسهل القراءة
 """
+
+        system_prompt_english = """
+You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
+
+🎯 **Primary Specialization**: 
+- Oil and gas engineering exclusively
+- ESP systems and artificial lift
+- Reservoir engineering and exploration
+- Drilling and production operations
+- Geophysical logging and oil data analysis
+
+🌐 **Strict Language Rules**:
+- If question is in Arabic → reply ONLY in Arabic
+- If question is in English → reply ONLY in English  
+- Never mix languages in the same response
+- If you must use an English technical term, write it then explain in parentheses
+
+👥 **Team Information (only when directly asked)**:
+- Hayder Naseem: Platform founder, petroleum engineer, programmer
+- Ali Bilal: Python programmer from Mosul
+- Noor Kanaan: Python programmer from Kirkuk
+- Arzu Metin: Data analyst and Python programmer from Kirkuk
+
+🚫 **Policies**:
+- Do not give personal information unless directly asked about team members
+- For non-oil/gas questions: "I specialize only in oil and gas engineering"
+- Maintain professionalism and technical accuracy
+- Organize responses in a structured, easy-to-read format
+"""
+
+        # اختيار النظام المناسب بناءً على لغة المستخدم
+        system_prompt = system_prompt_arabic if user_language == 'arabic' else system_prompt_english
 
         # ====== ردود خاصة بفريق المنصة ======
         msg_lower = user_msg.lower()
+        
+        # كلمات البحث العربية والإنجليزية
+        hayder_keywords_arabic = ["حيدر", "هايدر", "نسيم", "المؤسس", "منو مؤسس", "مؤسس المنصة", "بنيسان", "سامراء"]
+        hayder_keywords_english = ["hayder", "naseem", "founder", "owner", "creator", "samarra"]
+        
+        ali_keywords_arabic = ["علي بلال", "علي", "بلال", "زبور", "زمار", "موصل"]
+        ali_keywords_english = ["ali", "bilal", "mosul", "jubour"]
+        
+        noor_keywords_arabic = ["نور", "كنعان", "كردية", "كركوك"]
+        noor_keywords_english = ["noor", "kanaan", "kurdish", "kirkuk"]
+        
+        arzo_keywords_arabic = ["ارزو", "أرزو", "متين", "تركمانية"]
+        arzo_keywords_english = ["arzo", "arzu", "metin", "turkmen"]
 
-        if any(keyword in user_msg for keyword in ["منو مؤسس", "المؤسس", "حيدر", "هايدر"]) or "founder" in msg_lower:
-            reply = FOUNDERS_INFO["founder"]
+        # التحقق من طلبات معلومات الفريق
+        if any(keyword in msg_lower for keyword in hayder_keywords_arabic + [k.lower() for k in hayder_keywords_english]):
+            reply = get_founder_info("hayder", user_language)
             add_message_to_history(session_id, "user", user_msg)
             add_message_to_history(session_id, "assistant", reply)
             return jsonify({"reply": reply, "session_id": session_id})
 
-        if "علي بلال" in user_msg or "ali" in msg_lower:
-            reply = FOUNDERS_INFO["ali"]
+        elif any(keyword in msg_lower for keyword in ali_keywords_arabic + [k.lower() for k in ali_keywords_english]):
+            reply = get_founder_info("ali", user_language)
             add_message_to_history(session_id, "user", user_msg)
             add_message_to_history(session_id, "assistant", reply)
             return jsonify({"reply": reply, "session_id": session_id})
 
-        if "نور" in user_msg or "noor" in msg_lower:
-            reply = FOUNDERS_INFO["noor"]
+        elif any(keyword in msg_lower for keyword in noor_keywords_arabic + [k.lower() for k in noor_keywords_english]):
+            reply = get_founder_info("noor", user_language)
             add_message_to_history(session_id, "user", user_msg)
             add_message_to_history(session_id, "assistant", reply)
             return jsonify({"reply": reply, "session_id": session_id})
 
-        if "ارزو" in user_msg or "arzo" in msg_lower:
-            reply = FOUNDERS_INFO["arzo"]
+        elif any(keyword in msg_lower for keyword in arzo_keywords_arabic + [k.lower() for k in arzo_keywords_english]):
+            reply = get_founder_info("arzo", user_language)
             add_message_to_history(session_id, "user", user_msg)
             add_message_to_history(session_id, "assistant", reply)
             return jsonify({"reply": reply, "session_id": session_id})
@@ -189,25 +320,35 @@ STRICT RESPONSE POLICY:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
-            temperature=0.7,  # لزيادة الإبداع والمرونة في الردود
+            temperature=0.7,
             max_tokens=1024,
             top_p=0.9
         )
 
         reply = completion.choices[0].message.content
         
+        # تنظيف الرد
+        cleaned_reply = clean_response(reply)
+        
         # تحديث تاريخ المحادثة
         add_message_to_history(session_id, "user", user_msg)
-        add_message_to_history(session_id, "assistant", reply)
+        add_message_to_history(session_id, "assistant", cleaned_reply)
 
         return jsonify({
-            "reply": reply,
-            "session_id": session_id
+            "reply": cleaned_reply,
+            "session_id": session_id,
+            "detected_language": user_language
         })
 
     except Exception as e:
         print(f"Error: {e}")
-        return jsonify({"error": str(e)}), 500
+        error_msg_arabic = "عذراً، حدث خطأ في المعالجة. يرجى المحاولة مرة أخرى."
+        error_msg_english = "Sorry, an error occurred during processing. Please try again."
+        
+        user_language = detect_language(user_msg) if 'user_msg' in locals() else 'arabic'
+        error_msg = error_msg_arabic if user_language == 'arabic' else error_msg_english
+        
+        return jsonify({"error": error_msg}), 500
 
 @app.route("/clear_history", methods=["POST"])
 def clear_history():
@@ -223,6 +364,14 @@ def clear_history():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/get_session_info", methods=["GET"])
+def get_session_info():
+    """الحصول على معلومات الجلسة"""
+    return jsonify({
+        "active_sessions": len(conversations),
+        "sessions": list(conversations.keys())
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
