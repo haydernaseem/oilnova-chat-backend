@@ -8,277 +8,592 @@ import re
 
 app = Flask(__name__)
 
-# ---------------- CORS ----------------
+# ====== CORS FIX 100% ======
 CORS(app, resources={
     r"/*": {
-        "origins": ["*"],
+        "origins": ["https://petroai-iq.web.app", "*"],
         "methods": ["POST", "GET", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
 
-# ---------------- Groq Client ----------------
+# ====== Groq Client ======
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# ---------------- Conversations Memory ----------------
+# ====== تخزين المحادثات ======
 conversations = {}
 
-# ---------------- Team Info ----------------
+# ====== معلومات الفريق المحسنة ======
 FOUNDERS_INFO = {
     "hayder": {
-        "arabic": """الاسم: المهندس حيدر نسيم السامرائي
-الدور: مؤسس منصة OILNOVA
-الخبرة: مهندس نفط، محلل بيانات، مطور Frontend و Firebase Backend
-الدراسة: خريج جامعة كركوك / هندسة النفط 2025
-الأصل: من عشيرة السادة البنيسان الحسنية – سامراء
-الإنجاز: مؤسس أول منصة عربية نفطية تعتمد الذكاء الاصطناعي
-البريد: haydernaseem02@gmail.com""",
-        "english": """Name: Hayder Naseem Al-Samarrai
-Role: Founder of OILNOVA Platform
-Expertise: Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer
-Education: Petroleum Engineering – Kirkuk University – 2025
-Heritage: Al-Benisian Al-Hasaniyah Tribe – Samarra
-Achievement: Founder of the first Arabic oil & gas AI platform
-Email: haydernaseem02@gmail.com"""
+        "arabic": {
+            "name": "حيدر نسيم السامرائي",
+            "role": "مؤسس منصة OILNOVA",
+            "background": "مهندس نفط، محلل بيانات، مبرمج فرونت إند و Firebase باك إند",
+            "education": "خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط 2025",
+            "heritage": "من عشيرة السادة البنيسان الحسنية في سامراء",
+            "achievement": "أسس أويل نوفا كأول منصة عربية نفطية تستخدم الذكاء الاصطناعي",
+            "contact": "haydernaseem02@gmail.com"
+        },
+        "english": {
+            "name": "Hayder Naseem Al-Samarrai",
+            "role": "Founder of OILNOVA Platform", 
+            "background": "Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer",
+            "education": "Graduate of Kirkuk University / College of Engineering / Petroleum Engineering Dept. 2025",
+            "heritage": "Descendant of Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra",
+            "achievement": "Founded OILNOVA as the first Arabic oil platform using AI technologies",
+            "contact": "haydernaseem02@gmail.com"
+        }
     },
-
+    
     "ali": {
-        "arabic": """الاسم: علي بلال عبدالله خلف
-الدور: مبرمج بايثون
-الأصل: الموصل – ناحية زمار – عشيرة الجبور
-الدراسة: هندسة النفط
-البريد: ali.bilalabdullahkhalaf@gmail.com""",
-        "english": """Name: Ali Bilal Abdullah Khalaf
-Role: Python Developer
-Origin: Mosul – Al-Zumar – Al-Jubour Tribe
-Education: Petroleum Engineering
-Email: ali.bilalabdullahkhalaf@gmail.com"""
+        "arabic": {
+            "name": "علي بلال عبدالله خلف",
+            "role": "مبرمج بايثون ومطور تقني",
+            "background": "شغوف بمجال التكنولوجيا والبرمجة",
+            "education": "خريج هندسة النفط",
+            "heritage": "من مدينة الموصل / ناحية زمار / عشيرة الجبور",
+            "birth": "مواليد 2001",
+            "contact": "ali.bilalabdullahkhalaf@gmail.com"
+        },
+        "english": {
+            "name": "Ali Bilal Abdullah Khalaf",
+            "role": "Python Programmer and Tech Developer",
+            "background": "Passionate about technology and programming",
+            "education": "Petroleum Engineering Graduate", 
+            "heritage": "From Mosul City / Al-Zumar District / Al-Jubour Tribe",
+            "birth": "Born 2001",
+            "contact": "ali.bilalabdullahkhalaf@gmail.com"
+        }
     },
-
+    
     "noor": {
-        "arabic": """الاسم: نور كنعان حيدر
-الدور: مبرمجة بايثون
-الأصل: كردية من كركوك
-الدراسة: هندسة النفط – جامعة كركوك 2025
-البريد: noorkanaanhaider@gmail.com""",
-        "english": """Name: Noor Kanaan Haider
-Role: Python Developer
-Origin: Kurdish – Kirkuk
-Education: Petroleum Engineering – Kirkuk University 2025
-Email: noorkanaanhaider@gmail.com"""
+        "arabic": {
+            "name": "نور كنعان حيدر",
+            "role": "مبرمجة بايثون ومطورة تقنية",
+            "background": "شغوفة بمجال التكنولوجيا والبرمجة",
+            "education": "خريجة هندسة النفط - جامعة كركوك 2025",
+            "heritage": "كردية من كركوك",
+            "birth": "مواليد 2004", 
+            "future": "مستقبل مهني مشرق في مجال البرمجة",
+            "contact": "noorkanaanhaider@gmail.com"
+        },
+        "english": {
+            "name": "Noor Kanaan Haider",
+            "role": "Python Programmer and Tech Developer",
+            "background": "Passionate about technology and programming",
+            "education": "Petroleum Engineering Graduate - Kirkuk University 2025",
+            "heritage": "Kurdish from Kirkuk",
+            "birth": "Born 2004",
+            "future": "Promising professional future in programming field",
+            "contact": "noorkanaanhaider@gmail.com"
+        }
     },
-
+    
     "arzo": {
-        "arabic": """الاسم: أرزو متين
-الدور: محللة بيانات ومبرمجة بايثون
-الأصل: تركمانية من كركوك – مواليد 2004
-البريد: engarzo699@gmail.com""",
-        "english": """Name: Arzu Metin
-Role: Data Analyst & Python Developer
-Origin: Turkmen – Kirkuk – Born 2004
-Email: engarzo699@gmail.com"""
+        "arabic": {
+            "name": "أرزو متين",
+            "role": "محللة بيانات ومبرمجة بايثون",
+            "background": "شغوفة بالتكنولوجيا ومؤسسة مشاركة لمنصة أويل نوفا",
+            "heritage": "تركمانية من كركوك مواليد 2004",
+            "future": "مستقبل مهني كبير متوقع في مجال تحليل البيانات",
+            "contact": "engarzo699@gmail.com"
+        },
+        "english": {
+            "name": "Arzu Metin", 
+            "role": "Data Analyst and Python Programmer",
+            "background": "Technology enthusiast and co-founder of OILNOVA platform",
+            "heritage": "Turkmen from Kirkuk, born 2004",
+            "future": "Expected significant professional future in data analysis",
+            "contact": "engarzo699@gmail.com"
+        }
     }
 }
 
-# ========================================================
-#  LANGUAGE DETECTION
-# ========================================================
+# ====== تنظيف المحادثات القديمة ======
+def cleanup_old_conversations():
+    """حذف المحادثات الأقدم من ساعة"""
+    current_time = datetime.now()
+    expired_sessions = []
+    
+    for session_id, session_data in conversations.items():
+        if current_time - session_data['last_activity'] > timedelta(hours=1):
+            expired_sessions.append(session_id)
+    
+    for session_id in expired_sessions:
+        del conversations[session_id]
+
+def get_conversation_history(session_id):
+    """استرجاع تاريخ المحادثة"""
+    if session_id not in conversations:
+        conversations[session_id] = {
+            'messages': [],
+            'last_activity': datetime.now(),
+            'context': {}
+        }
+    else:
+        conversations[session_id]['last_activity'] = datetime.now()
+    
+    return conversations[session_id]
+
+def add_message_to_history(session_id, role, content):
+    """إضافة رسالة جديدة للمحادثة"""
+    session = get_conversation_history(session_id)
+    session['messages'].append({"role": role, "content": content})
+    
+    # الحفاظ على آخر 12 رسالة فقط
+    if len(session['messages']) > 12:
+        session['messages'] = session['messages'][-12:]
+
 def detect_language(text):
-    ar = len(re.findall(r'[\u0600-\u06FF]', text))
-    en = len(re.findall(r'[a-zA-Z]', text))
-    return "arabic" if ar >= en else "english"
+    """كشف لغة النص بدقة"""
+    arabic_chars = len(re.findall(r'[\u0600-\u06FF]', text))
+    english_chars = len(re.findall(r'[a-zA-Z]', text))
+    
+    if arabic_chars > english_chars:
+        return 'arabic'
+    elif english_chars > arabic_chars:
+        return 'english'
+    else:
+        # إذا كانت متساوية، ننظر إلى الكلمات
+        arabic_words = len(re.findall(r'\b[\u0600-\u06FF]+\b', text))
+        english_words = len(re.findall(r'\b[a-zA-Z]+\b', text))
+        return 'arabic' if arabic_words >= english_words else 'english'
 
-
-# ========================================================
-#  LIST FORMAT ENFORCER (MODE A – STRICT)
-# ========================================================
-def enforce_list_format(text, lang):
-    # رقم + نقطة + مسافة
-    numbered = re.findall(r'\d+\.\s*[^\.]+', text)
-    bullets = re.findall(r'[-•]\s*[^\.]+', text)
-
-    formatted = text
-
-    # Format numbered lists
-    for item in numbered:
-        clean = item.strip()
-        formatted = formatted.replace(item, f"\n{clean}")
-
-    # Format bullet lists
-    for item in bullets:
-        clean = item.strip()
-        formatted = formatted.replace(item, f"\n{clean}")
-
-    # Remove double spaces and extra newlines
-    formatted = re.sub(r'\n\s*\n', '\n', formatted)
-    formatted = re.sub(r' +', ' ', formatted)
-
-    # Convert numbers to Arabic if needed
-    if lang == "arabic":
-        table = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
-        formatted = formatted.translate(table)
-
-    return formatted.strip()
-
-
-# ========================================================
-#  CLEAN + NORMALIZE RESPONSE
-# ========================================================
-def clean(text, lang):
-    if not text:
-        return ""
-
-    # Basic cleaning
-    text = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\(\)\/]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-
-    # Add forced list formatting
-    text = enforce_list_format(text, lang)
-
+# ====== FORMATTING FUNCTIONS ======
+def convert_english_numbers_to_arabic(text):
+    """تحويل الأرقام الإنجليزية إلى عربية"""
+    number_map = {
+        '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
+        '5': '٥', '6': '٦', '7': '٧', '8': '٨', '9': '٩'
+    }
+    
+    for eng_num, arabic_num in number_map.items():
+        text = text.replace(eng_num, arabic_num)
+    
     return text
 
+def enforce_list_formatting(text, language):
+    """تطبيق التنسيق الإجباري للقوائم - كل نقطة في سطر مستقل"""
+    
+    # أنماط للتعرف على القوائم المرقمة والنقطية
+    numbered_pattern = r'(\d+\.\s*[^\n]+)'
+    bullet_pattern = r'([•\-*]\s*[^\n]+)'
+    
+    # معالجة القوائم المرقمة
+    def format_numbered_list(match):
+        items = match.group(0).strip().split('\n')
+        formatted_items = []
+        
+        for item in items:
+            item = item.strip()
+            if re.match(r'^\d+\.', item):
+                # إضافة سطر جديد قبل كل نقطة مرقمة
+                formatted_items.append('\n' + item)
+            else:
+                formatted_items.append(item)
+        
+        return ''.join(formatted_items).strip()
+    
+    # معالجة القوائم النقطية
+    def format_bullet_list(match):
+        items = match.group(0).strip().split('\n')
+        formatted_items = []
+        
+        for item in items:
+            item = item.strip()
+            if re.match(r'^[•\-*]', item):
+                # إضافة سطر جديد قبل كل نقطة
+                formatted_items.append('\n' + item)
+            else:
+                formatted_items.append(item)
+        
+        return ''.join(formatted_items).strip()
+    
+    # تطبيق التنسيق على القوائم المرقمة
+    text = re.sub(numbered_pattern, format_numbered_list, text, flags=re.MULTILINE | re.DOTALL)
+    
+    # تطبيق التنسيق على القوائم النقطية
+    text = re.sub(bullet_pattern, format_bullet_list, text, flags=re.MULTILINE | re.DOTALL)
+    
+    # تنظيف المسافات الزائدة بين الأسطر
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    
+    return text.strip()
 
-# ========================================================
-#  TEAM HANDLER
-# ========================================================
-def handle_team_request(msg, lang):
-    msg_lower = msg.lower()
+def format_arabic_text(text):
+    """تنسيق النص العربي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    # تحويل الأرقام أولاً
+    text = convert_english_numbers_to_arabic(text)
+    
+    # تطبيق التنسيق الإجباري للقوائم
+    text = enforce_list_formatting(text, 'arabic')
+    
+    lines = text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            formatted_lines.append('')
+            continue
+            
+        # تحسين القوائم المرقمة (بعد التنسيق الإجباري)
+        if re.match(r'^\d+\.', line):
+            line = re.sub(r'^(\d+)\.', r'\1.', line)
+            line = convert_english_numbers_to_arabic(line)
+        
+        # تحسين النقاط النقطية
+        elif re.match(r'^[•]', line):
+            line = re.sub(r'^[•]\s*', '• ', line)
+        
+        formatted_lines.append(line)
+    
+    formatted_text = '\n'.join(formatted_lines)
+    
+    # التنظيف النهائي
+    formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
+    formatted_text = re.sub(r' +', ' ', formatted_text)
+    
+    return formatted_text.strip()
 
-    if any(k in msg_lower for k in ["حيدر", "هايدر", "المؤسس", "بنيسان", "hayder", "founder"]):
-        return FOUNDERS_INFO["hayder"][lang]
+def format_english_text(text):
+    """تنسيق النص الإنجليزي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    # تطبيق التنسيق الإجباري للقوائم أولاً
+    text = enforce_list_formatting(text, 'english')
+    
+    lines = text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            formatted_lines.append('')
+            continue
+            
+        # تحسين القوائم المرقمة (بعد التنسيق الإجباري)
+        if re.match(r'^\d+\.', line):
+            line = re.sub(r'^(\d+)\.', r'\1. ', line)
+        
+        # تحسين النقاط النقطية
+        elif re.match(r'^[-]', line):
+            line = re.sub(r'^[-]\s*', '- ', line)
+        
+        formatted_lines.append(line)
+    
+    formatted_text = '\n'.join(formatted_lines)
+    
+    # التنظيف النهائي
+    formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
+    formatted_text = re.sub(r' +', ' ', formatted_text)
+    
+    return formatted_text.strip()
 
-    if any(k in msg_lower for k in ["علي", "بلال", "ali", "bilal"]):
-        return FOUNDERS_INFO["ali"][lang]
+def format_final_response(text, language):
+    """تنسيق الرد النهائي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    if not text:
+        return text
+    
+    # التنظيف الأساسي
+    text = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\\n]', '', text)
+    text = re.sub(r'\s+', ' ', text)
+    
+    # التنسيق حسب اللغة مع الالتزام بالتنسيق الإجباري
+    if language == 'arabic':
+        return format_arabic_text(text)
+    else:
+        return format_english_text(text)
 
-    if any(k in msg_lower for k in ["نور", "كنعان", "noor"]):
-        return FOUNDERS_INFO["noor"][lang]
+def rewrite_team_member_info(member_key, language):
+    """إعادة كتابة معلومات أعضاء الفريق بشكل طبيعي وسلس"""
+    if member_key not in FOUNDERS_INFO:
+        return "لم يتم العثور على المعلومات المطلوبة." if language == 'arabic' else "Requested information not found."
+    
+    member_info = FOUNDERS_INFO[member_key][language]
+    
+    if language == 'arabic':
+        if member_key == "hayder":
+            return f"""🛢️ **{member_info['name']}** - {member_info['role']}
 
-    if any(k in msg_lower for k in ["ارزو", "أرزو", "arzo", "arzu"]):
-        return FOUNDERS_INFO["arzo"][lang]
+{member_info['background']}، {member_info['education']}. {member_info['heritage']}، و{member_info['achievement']}.
 
-    return None
+📧 **للتواصل**: {member_info['contact']}"""
+        
+        elif member_key == "ali":
+            return f"""👨‍💻 **{member_info['name']}**
 
+{member_info['role']} {member_info['background']}. {member_info['education']}، {member_info['heritage']} ({member_info['birth']}).
 
-# ========================================================
-#  SYSTEM PROMPT
-# ========================================================
-SYSTEM_AR = """
-أنت مساعد OILNOVA الذكي المتخصص في هندسة النفط والغاز.
+📧 **للتواصل**: {member_info['contact']}"""
+        
+        elif member_key == "noor":
+            return f"""👩‍💻 **{member_info['name']}**
 
-القواعد:
-1. إذا كان السؤال بالعربية → أجب بالعربية فقط.
-2. إذا كان السؤال بالإنجليزية → أجب بالإنجليزية فقط.
-3. يمنع خلط اللغات.
-4. عند الإجابة بنقاط، يجب أن تكون كل نقطة في سطر مستقل.
-5. استخدم فقط النمط التالي:
-1. نص
-2. نص
-3. نص
-6. التزم بالدقة والاحترافية.
-"""
+{member_info['role']} {member_info['background']}. {member_info['education']}، {member_info['heritage']} ({member_info['birth']})، و{member_info['future']}.
 
-SYSTEM_EN = """
-You are OILNOVA Smart Assistant specialized in oil & gas engineering.
+📧 **للتواصل**: {member_info['contact']}"""
+        
+        elif member_key == "arzo":
+            return f"""📊 **{member_info['name']}**
 
-Rules:
-1. If the question is in Arabic → answer ONLY in Arabic.
-2. If the question is in English → answer ONLY in English.
-3. Do not mix languages.
-4. When listing steps or points, each point MUST be on a separate line.
-5. Use this format only:
-1. Text
-2. Text
-3. Text
-6. Maintain accuracy and professional tone.
-"""
+{member_info['role']} {member_info['background']}. {member_info['heritage']}، و{member_info['future']}.
 
+📧 **للتواصل**: {member_info['contact']}"""
+    
+    else:  # English
+        if member_key == "hayder":
+            return f"""🛢️ **{member_info['name']}** - {member_info['role']}
 
-# ========================================================
-#  SESSION HANDLER
-# ========================================================
-def get_session(id):
-    if id not in conversations:
-        conversations[id] = {
-            "messages": [],
-            "last": datetime.now()
-        }
-    return conversations[id]
+{member_info['background']}, {member_info['education']}. {member_info['heritage']}, and {member_info['achievement']}.
 
+📧 **Contact**: {member_info['contact']}"""
+        
+        elif member_key == "ali":
+            return f"""👨‍💻 **{member_info['name']}**
 
-# ========================================================
-#  ROUTES
-# ========================================================
+{member_info['role']} who is {member_info['background']}. {member_info['education']} from {member_info['heritage']} ({member_info['birth']}).
+
+📧 **Contact**: {member_info['contact']}"""
+        
+        elif member_key == "noor":
+            return f"""👩‍💻 **{member_info['name']}**
+
+{member_info['role']} who is {member_info['background']}. {member_info['education']}, {member_info['heritage']} ({member_info['birth']}), with a {member_info['future']}.
+
+📧 **Contact**: {member_info['contact']}"""
+        
+        elif member_key == "arzo":
+            return f"""📊 **{member_info['name']}**
+
+{member_info['role']} and {member_info['background']}. {member_info['heritage']}, with an {member_info['future']}.
+
+📧 **Contact**: {member_info['contact']}"""
+
 @app.route("/")
 def home():
-    return "OILNOVA CHAT API OK - MODE A"
+    return "OILNOVA CHAT BACKEND IS RUNNING OK - ENHANCED PROFESSIONAL VERSION"
 
 @app.route("/start_session", methods=["GET"])
 def start_session():
-    sid = str(uuid.uuid4())
-    conversations[sid] = {"messages": [], "last": datetime.now()}
-    return jsonify({"session_id": sid})
+    """بدء جلسة محادثة جديدة"""
+    session_id = str(uuid.uuid4())
+    conversations[session_id] = {
+        'messages': [],
+        'last_activity': datetime.now(),
+        'context': {}
+    }
+    return jsonify({"session_id": session_id})
 
-
-# ========================================================
-#  CHAT ENDPOINT
-# ========================================================
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
-    msg = data.get("message", "").strip()
-    sid = data.get("session_id", "default")
+    try:
+        data = request.json
+        user_msg = data.get("message", "").strip()
+        session_id = data.get("session_id", "default")
 
-    if not msg:
-        return jsonify({"error": "Empty message"}), 400
+        if not user_msg:
+            return jsonify({"error": "الرسالة فارغة"}), 400
 
-    lang = detect_language(msg)
-    system_prompt = SYSTEM_AR if lang == "arabic" else SYSTEM_EN
+        # تنظيف المحادثات القديمة
+        cleanup_old_conversations()
 
-    session = get_session(sid)
+        # كشف لغة المستخدم
+        user_language = detect_language(user_msg)
+        
+        # استرجاع تاريخ المحادثة
+        session_data = get_conversation_history(session_id)
+        conversation_history = session_data['messages']
 
-    # Check team info
-    t = handle_team_request(msg, lang)
-    if t:
-        return jsonify({"reply": t, "session_id": sid})
+        # ====== SYSTEM PROMPT المحسن والاحترافي مع التنسيق الإجباري ======
+        system_prompt_arabic = """
+أنت مساعد OILNOVA الذكي - مساعد متخصص في هندسة النفط والغاز.
 
-    # Build messages
-    messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(session["messages"])
-    messages.append({"role": "user", "content": msg})
+🎯 **التخصص الأساسي**: 
+- هندسة النفط والغاز بشكل حصري
+- أنظمة ESP والرفع الاصطناعي
+- هندسة المكامن والتنقيب
+- عمليات الحفر والإنتاج
+- التسجيل الجيوفيزيائي وتحليل البيانات النفطية
 
-    # Call Groq
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=messages,
-        temperature=0.4,
-        max_tokens=800
-    )
+🌐 **قواعد اللغة الصارمة**:
+- إذا كان السؤال بالعربية → أجب بالعربية فقط
+- إذا كان السؤال بالإنجليزية → أجب بالإنجليزية فقط  
+- لا تخلط اللغات أبداً في الرد الواحد
+- إذا اضطررت لاستخدام مصطلح تقني إنجليزي، اكتبه ثم اشرحه بين قوسين
 
-    reply = completion.choices[0].message.content
+📝 **التنسيق الإجباري للقوائم**:
+- عند الإجابة عن أي سؤال يحتوي على أجزاء أو خطوات أو تعداد نقطي، يجب أن تكتب كل نقطة في سطر مستقل
+- استخدم هذا التنسيق فقط:
+  
+1. [النقطة الأولى]
+2. [النقطة الثانية] 
+3. [النقطة الثالثة]
 
-    # Clean + enforce formatting
-    final = clean(reply, lang)
+- أضف سطر جديد قبل كل رقم، ولا تكتب أي نقطة في نفس السطر مع نقطة أخرى
 
-    # Save conversation
-    session["messages"].append({"role": "user", "content": msg})
-    session["messages"].append({"role": "assistant", "content": final})
+👥 **معلومات الفريق (فقط عند السؤال المباشر)**:
+- حيدر نسيم: مؤسس المنصة، مهندس نفط، مبرمج
+- علي بلال: مبرمج بايثون من الموصل
+- نور كنعان: مبرمجة بايثون من كركوك
+- أرزو متين: محللة بيانات ومبرمجة بايثون من كركوك
 
-    return jsonify({"reply": final, "session_id": sid})
+🚫 **السياسات**:
+- لا تعطي معلومات شخصية إلا عند السؤال المباشر عن أعضاء الفريق
+- للأسئلة خارج تخصص النفط: "أنا متخصص في هندسة النفط والغاز فقط"
+- حافظ على الاحترافية والدقة التقنية
+- رتب الردود بشكل منظم وسهل القراءة
+- التزم بالتنسيق الإجباري للقوائم في كل الإجابات
+"""
 
+        system_prompt_english = """
+You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
 
-# ========================================================
-#  CLEAR HISTORY
-# ========================================================
+🎯 **Primary Specialization**: 
+- Oil and gas engineering exclusively
+- ESP systems and artificial lift
+- Reservoir engineering and exploration
+- Drilling and production operations
+- Geophysical logging and oil data analysis
+
+🌐 **Strict Language Rules**:
+- If question is in Arabic → reply ONLY in Arabic
+- If question is in English → reply ONLY in English  
+- Never mix languages in the same response
+- If you must use an English technical term, write it then explain in parentheses
+
+📝 **Mandatory List Formatting**:
+- When answering any question containing parts, steps, or bullet points, you MUST write each point on a separate line
+- Use this format ONLY:
+  
+1. [First point]
+2. [Second point]
+3. [Third point]
+
+- Add a newline before each number, and never write two points on the same line
+
+👥 **Team Information (only when directly asked)**:
+- Hayder Naseem: Platform founder, petroleum engineer, programmer
+- Ali Bilal: Python programmer from Mosul
+- Noor Kanaan: Python programmer from Kirkuk
+- Arzu Metin: Data analyst and Python programmer from Kirkuk
+
+🚫 **Policies**:
+- Do not give personal information unless directly asked about team members
+- For non-oil/gas questions: "I specialize only in oil and gas engineering"
+- Maintain professionalism and technical accuracy
+- Organize responses in a structured, easy-to-read format
+- Strictly adhere to mandatory list formatting in all responses
+"""
+
+        # اختيار النظام المناسب بناءً على لغة المستخدم
+        system_prompt = system_prompt_arabic if user_language == 'arabic' else system_prompt_english
+
+        # ====== ردود خاصة بفريق المنصة ======
+        msg_lower = user_msg.lower()
+        
+        # كلمات البحث العربية والإنجليزية
+        hayder_keywords_arabic = ["حيدر", "هايدر", "نسيم", "المؤسس", "منو مؤسس", "مؤسس المنصة", "بنيسان", "سامراء"]
+        hayder_keywords_english = ["hayder", "naseem", "founder", "owner", "creator", "samarra"]
+        
+        ali_keywords_arabic = ["علي بلال", "علي", "بلال", "زبور", "زمار", "موصل"]
+        ali_keywords_english = ["ali", "bilal", "mosul", "jubour"]
+        
+        noor_keywords_arabic = ["نور", "كنعان", "كردية", "كركوك"]
+        noor_keywords_english = ["noor", "kanaan", "kurdish", "kirkuk"]
+        
+        arzo_keywords_arabic = ["ارزو", "أرزو", "متين", "تركمانية"]
+        arzo_keywords_english = ["arzo", "arzu", "metin", "turkmen"]
+
+        # التحقق من طلبات معلومات الفريق
+        if any(keyword in msg_lower for keyword in hayder_keywords_arabic + [k.lower() for k in hayder_keywords_english]):
+            reply = rewrite_team_member_info("hayder", user_language)
+            add_message_to_history(session_id, "user", user_msg)
+            add_message_to_history(session_id, "assistant", reply)
+            return jsonify({"reply": reply, "session_id": session_id})
+
+        elif any(keyword in msg_lower for keyword in ali_keywords_arabic + [k.lower() for k in ali_keywords_english]):
+            reply = rewrite_team_member_info("ali", user_language)
+            add_message_to_history(session_id, "user", user_msg)
+            add_message_to_history(session_id, "assistant", reply)
+            return jsonify({"reply": reply, "session_id": session_id})
+
+        elif any(keyword in msg_lower for keyword in noor_keywords_arabic + [k.lower() for k in noor_keywords_english]):
+            reply = rewrite_team_member_info("noor", user_language)
+            add_message_to_history(session_id, "user", user_msg)
+            add_message_to_history(session_id, "assistant", reply)
+            return jsonify({"reply": reply, "session_id": session_id})
+
+        elif any(keyword in msg_lower for keyword in arzo_keywords_arabic + [k.lower() for k in arzo_keywords_english]):
+            reply = rewrite_team_member_info("arzo", user_language)
+            add_message_to_history(session_id, "user", user_msg)
+            add_message_to_history(session_id, "assistant", reply)
+            return jsonify({"reply": reply, "session_id": session_id})
+
+        # ====== بناء رسائل المحادثة مع السياق ======
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # إضافة تاريخ المحادثة السابقة
+        messages.extend(conversation_history)
+        
+        # إضافة الرسالة الحالية
+        messages.append({"role": "user", "content": user_msg})
+
+        # ====== AI COMPLETION مع تحسينات ======
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1024,
+            top_p=0.9
+        )
+
+        reply = completion.choices[0].message.content
+        
+        # ✅ تطبيق التنسيق المحسن على الرد مع الالتزام بالتنسيق الإجباري
+        formatted_reply = format_final_response(reply, user_language)
+        
+        # تحديث تاريخ المحادثة
+        add_message_to_history(session_id, "user", user_msg)
+        add_message_to_history(session_id, "assistant", formatted_reply)
+
+        return jsonify({
+            "reply": formatted_reply,
+            "session_id": session_id,
+            "detected_language": user_language
+        })
+
+    except Exception as e:
+        print(f"Error: {e}")
+        error_msg_arabic = "عذراً، حدث خطأ في المعالجة. يرجى المحاولة مرة أخرى."
+        error_msg_english = "Sorry, an error occurred during processing. Please try again."
+        
+        user_language = detect_language(user_msg) if 'user_msg' in locals() else 'arabic'
+        error_msg = error_msg_arabic if user_language == 'arabic' else error_msg_english
+        
+        return jsonify({"error": error_msg}), 500
+
 @app.route("/clear_history", methods=["POST"])
 def clear_history():
-    sid = request.json.get("session_id", "default")
-    if sid in conversations:
-        conversations[sid]["messages"] = []
-    return jsonify({"message": "cleared"})
+    """مسح تاريخ المحادثة"""
+    try:
+        data = request.json
+        session_id = data.get("session_id", "default")
+        
+        if session_id in conversations:
+            conversations[session_id]['messages'] = []
+        
+        return jsonify({"message": "تم مسح تاريخ المحادثة", "session_id": session_id})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/get_session_info", methods=["GET"])
+def get_session_info():
+    """الحصول على معلومات الجلسة"""
+    return jsonify({
+        "active_sessions": len(conversations),
+        "sessions": list(conversations.keys())
+    })
 
-# ========================================================
-#  RUN
-# ========================================================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
