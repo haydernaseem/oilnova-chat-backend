@@ -173,12 +173,62 @@ def convert_english_numbers_to_arabic(text):
     
     return text
 
+def enforce_list_formatting(text, language):
+    """تطبيق التنسيق الإجباري للقوائم - كل نقطة في سطر مستقل"""
+    
+    # أنماط للتعرف على القوائم المرقمة والنقطية
+    numbered_pattern = r'(\d+\.\s*[^\n]+)'
+    bullet_pattern = r'([•\-*]\s*[^\n]+)'
+    
+    # معالجة القوائم المرقمة
+    def format_numbered_list(match):
+        items = match.group(0).strip().split('\n')
+        formatted_items = []
+        
+        for item in items:
+            item = item.strip()
+            if re.match(r'^\d+\.', item):
+                # إضافة سطر جديد قبل كل نقطة مرقمة
+                formatted_items.append('\n' + item)
+            else:
+                formatted_items.append(item)
+        
+        return ''.join(formatted_items).strip()
+    
+    # معالجة القوائم النقطية
+    def format_bullet_list(match):
+        items = match.group(0).strip().split('\n')
+        formatted_items = []
+        
+        for item in items:
+            item = item.strip()
+            if re.match(r'^[•\-*]', item):
+                # إضافة سطر جديد قبل كل نقطة
+                formatted_items.append('\n' + item)
+            else:
+                formatted_items.append(item)
+        
+        return ''.join(formatted_items).strip()
+    
+    # تطبيق التنسيق على القوائم المرقمة
+    text = re.sub(numbered_pattern, format_numbered_list, text, flags=re.MULTILINE | re.DOTALL)
+    
+    # تطبيق التنسيق على القوائم النقطية
+    text = re.sub(bullet_pattern, format_bullet_list, text, flags=re.MULTILINE | re.DOTALL)
+    
+    # تنظيف المسافات الزائدة بين الأسطر
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    
+    return text.strip()
+
 def format_arabic_text(text):
-    """تنسيق النص العربي بشكل احترافي"""
-    # تحويل الأرقام
+    """تنسيق النص العربي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    # تحويل الأرقام أولاً
     text = convert_english_numbers_to_arabic(text)
     
-    # تحسين التنسيق للقوائم
+    # تطبيق التنسيق الإجباري للقوائم
+    text = enforce_list_formatting(text, 'arabic')
+    
     lines = text.split('\n')
     formatted_lines = []
     
@@ -188,28 +238,30 @@ def format_arabic_text(text):
             formatted_lines.append('')
             continue
             
-        # تحسين القوائم المرقمة
+        # تحسين القوائم المرقمة (بعد التنسيق الإجباري)
         if re.match(r'^\d+\.', line):
-            line = re.sub(r'^(\d+)\.', r' \1.', line)
+            line = re.sub(r'^(\d+)\.', r'\1.', line)
             line = convert_english_numbers_to_arabic(line)
         
         # تحسين النقاط النقطية
-        elif re.match(r'^[-•*]', line):
-            line = re.sub(r'^[-•*]\s*', '• ', line)
+        elif re.match(r'^[•]', line):
+            line = re.sub(r'^[•]\s*', '• ', line)
         
         formatted_lines.append(line)
     
-    # إضافة مسافات بين الفقرات
     formatted_text = '\n'.join(formatted_lines)
     
-    # تنظيف المسافات الزائدة
+    # التنظيف النهائي
     formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
     formatted_text = re.sub(r' +', ' ', formatted_text)
     
     return formatted_text.strip()
 
 def format_english_text(text):
-    """تنسيق النص الإنجليزي بشكل احترافي"""
+    """تنسيق النص الإنجليزي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    # تطبيق التنسيق الإجباري للقوائم أولاً
+    text = enforce_list_formatting(text, 'english')
+    
     lines = text.split('\n')
     formatted_lines = []
     
@@ -219,27 +271,26 @@ def format_english_text(text):
             formatted_lines.append('')
             continue
             
-        # تحسين القوائم المرقمة
+        # تحسين القوائم المرقمة (بعد التنسيق الإجباري)
         if re.match(r'^\d+\.', line):
             line = re.sub(r'^(\d+)\.', r'\1. ', line)
         
-        # تحسين النقاط النقطية  
-        elif re.match(r'^[-•*]', line):
-            line = re.sub(r'^[-•*]\s*', '- ', line)
+        # تحسين النقاط النقطية
+        elif re.match(r'^[-]', line):
+            line = re.sub(r'^[-]\s*', '- ', line)
         
         formatted_lines.append(line)
     
-    # إضافة مسافات بين الفقرات
     formatted_text = '\n'.join(formatted_lines)
     
-    # تنظيف المسافات الزائدة
+    # التنظيف النهائي
     formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
     formatted_text = re.sub(r' +', ' ', formatted_text)
     
     return formatted_text.strip()
 
 def format_final_response(text, language):
-    """تنسيق الرد النهائي بشكل احترافي"""
+    """تنسيق الرد النهائي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
     if not text:
         return text
     
@@ -247,7 +298,7 @@ def format_final_response(text, language):
     text = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\\n]', '', text)
     text = re.sub(r'\s+', ' ', text)
     
-    # التنسيق حسب اللغة
+    # التنسيق حسب اللغة مع الالتزام بالتنسيق الإجباري
     if language == 'arabic':
         return format_arabic_text(text)
     else:
@@ -353,7 +404,7 @@ def chat():
         session_data = get_conversation_history(session_id)
         conversation_history = session_data['messages']
 
-        # ====== SYSTEM PROMPT المحسن والاحترافي ======
+        # ====== SYSTEM PROMPT المحسن والاحترافي مع التنسيق الإجباري ======
         system_prompt_arabic = """
 أنت مساعد OILNOVA الذكي - مساعد متخصص في هندسة النفط والغاز.
 
@@ -370,6 +421,16 @@ def chat():
 - لا تخلط اللغات أبداً في الرد الواحد
 - إذا اضطررت لاستخدام مصطلح تقني إنجليزي، اكتبه ثم اشرحه بين قوسين
 
+📝 **التنسيق الإجباري للقوائم**:
+- عند الإجابة عن أي سؤال يحتوي على أجزاء أو خطوات أو تعداد نقطي، يجب أن تكتب كل نقطة في سطر مستقل
+- استخدم هذا التنسيق فقط:
+  
+1. [النقطة الأولى]
+2. [النقطة الثانية] 
+3. [النقطة الثالثة]
+
+- أضف سطر جديد قبل كل رقم، ولا تكتب أي نقطة في نفس السطر مع نقطة أخرى
+
 👥 **معلومات الفريق (فقط عند السؤال المباشر)**:
 - حيدر نسيم: مؤسس المنصة، مهندس نفط، مبرمج
 - علي بلال: مبرمج بايثون من الموصل
@@ -381,6 +442,7 @@ def chat():
 - للأسئلة خارج تخصص النفط: "أنا متخصص في هندسة النفط والغاز فقط"
 - حافظ على الاحترافية والدقة التقنية
 - رتب الردود بشكل منظم وسهل القراءة
+- التزم بالتنسيق الإجباري للقوائم في كل الإجابات
 """
 
         system_prompt_english = """
@@ -399,6 +461,16 @@ You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
 - Never mix languages in the same response
 - If you must use an English technical term, write it then explain in parentheses
 
+📝 **Mandatory List Formatting**:
+- When answering any question containing parts, steps, or bullet points, you MUST write each point on a separate line
+- Use this format ONLY:
+  
+1. [First point]
+2. [Second point]
+3. [Third point]
+
+- Add a newline before each number, and never write two points on the same line
+
 👥 **Team Information (only when directly asked)**:
 - Hayder Naseem: Platform founder, petroleum engineer, programmer
 - Ali Bilal: Python programmer from Mosul
@@ -410,6 +482,7 @@ You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
 - For non-oil/gas questions: "I specialize only in oil and gas engineering"
 - Maintain professionalism and technical accuracy
 - Organize responses in a structured, easy-to-read format
+- Strictly adhere to mandatory list formatting in all responses
 """
 
         # اختيار النظام المناسب بناءً على لغة المستخدم
@@ -476,7 +549,7 @@ You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
 
         reply = completion.choices[0].message.content
         
-        # ✅ تطبيق التنسيق المحسن على الرد
+        # ✅ تطبيق التنسيق المحسن على الرد مع الالتزام بالتنسيق الإجباري
         formatted_reply = format_final_response(reply, user_language)
         
         # تحديث تاريخ المحادثة
