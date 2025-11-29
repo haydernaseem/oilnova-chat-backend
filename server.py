@@ -1,377 +1,291 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import os
-from groq import Groq
+import re
 import uuid
 from datetime import datetime, timedelta
-import re
+from typing import List, Optional, Dict, Any
 
-app = Flask(__name__)
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# ====== CORS FIX 100% ======
-CORS(app, resources={
-    r"/*": {
-        "origins": ["https://petroai-iq.web.app", "*"],
-        "methods": ["POST", "GET", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+# =========================== GROQ ONLY ===========================
+from groq import Groq
 
-# ====== Groq Client ======
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+# =========================== Firebase ===========================
+HAS_FIREBASE = False
+try:
+    import firebase_admin
+    from firebase_admin import credentials, db
+    HAS_FIREBASE = True
+except ImportError:
+    firebase_admin = None
 
-# ====== تخزين المحادثات ======
-conversations = {}
+# =========================== إعداد CORS ===========================
 
-# ====== معلومات الفريق المحسنة ======
+FRONTEND_ORIGINS = [
+    "https://petroai-iq.web.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "*",
+]
+
+# =========================== الجلسات ===========================
+
+conversations: Dict[str, Dict[str, Any]] = {}
+
+# =========================== معلومات الفريق ===========================
+
 FOUNDERS_INFO = {
     "hayder": {
-        "arabic": """المهندس حيدر نسيم السامرائي - مؤسس منصة OILNOVA
-• مهندس نفط، محلل بيانات، مبرمج فرونت إند و Firebase باك إند
-• خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط 2025
-• من عشيرة السادة البنيسان الحسنية في سامراء
-• أسس أويل نوفا كأول منصة عربية نفطية تستخدم الذكاء الاصطناعي
-
-للتواصل: haydernaseem02@gmail.com""",
-        
-        "english": """Engineer Hayder Naseem Al-Samarrai - Founder of OILNOVA Platform
-• Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer
-• Graduate of Kirkuk University / College of Engineering / Petroleum Engineering Dept. 2025
-• Descendant of Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra
-• Founded OILNOVA as the first Arabic oil platform using AI technologies
-
-Contact: haydernaseem02@gmail.com"""
+        "arabic": """المهندس حيدر نسيم السامرائي، مهندس نفط ومحلل بيانات ومبرمج واجهات أمامية ومطور Firebase كباك إند. خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط لعام 2025، ومن عشيرة السادة البنيسان الحسنية في سامراء. أسس منصة OILNOVA كأحد أوائل المنصات العربية النفطية التي تعتمد على تقنيات الذكاء الاصطناعي لخدمة قطاع النفط والغاز.""",
+        "english": """Engineer Hayder Naseem Al-Samarrai is a petroleum engineer, data analyst, and frontend developer with Firebase backend experience. He graduated from Kirkuk University, College of Engineering, Petroleum Engineering Department (2025), and belongs to Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra. He founded the OILNOVA platform as one of the first Arabic oil and gas platforms powered by AI technologies."""
     },
-    
+
     "ali": {
-        "arabic": """علي بلال عبدالله خلف
-• مبرمج بايثون وشغوف بمجال التكنولوجيا
-• من مدينة الموصل / ناحية زمار / عشيرة الجبور
-• مواليد 2001
-• خريج هندسة نفط
-
-للتواصل: ali.bilalabdullahkhalaf@gmail.com""",
-        
-        "english": """Ali Bilal Abdullah Khalaf
-• Python Programmer passionate about technology
-• From Mosul City / Al-Zumar District / Al-Jubour Tribe
-• Born 2001
-• Petroleum Engineering Graduate
-
-Contact: ali.bilalabdullahkhalaf@gmail.com"""
+        "arabic": """علي بلال عبدالله خلف، مبرمج بايثون شغوف بالتكنولوجيا ومن مدينة الموصل / ناحية زمار / عشيرة الجبور. خريج هندسة نفط. يساهم في تطوير الأنظمة الذكية والبرمجيات داخل منصة OILNOVA.""",
+        "english": """Ali Bilal Abdullah Khalaf is a Python programmer passionate about technology, from Mosul/Al-Zumar district. He is a petroleum engineering graduate contributing to backend and smart tools development inside OILNOVA."""
     },
-    
+
     "noor": {
-        "arabic": """نور كنعان حيدر
-• مبرمجة بايثون وشغوفة بمجال التكنولوجيا
-• كردية من كركوك
-• مواليد 2004
-• خريجة هندسة نفط - جامعة كركوك 2025
-• مستقبل مهني مشرق في مجال البرمجة
-
-للتواصل: noorkanaanhaider@gmail.com""",
-        
-        "english": """Noor Kanaan Haider
-• Python Programmer passionate about technology
-• Kurdish from Kirkuk
-• Born 2004
-• Petroleum Engineering Graduate - Kirkuk University 2025
-• Promising professional future in programming field
-
-Contact: noorkanaanhaider@gmail.com"""
+        "arabic": """نور كنعان حيدر، مبرمجة بايثون وشغوفة بتحليل البيانات، كردية من كركوك من مواليد 2004 وخريجة هندسة نفط لعام 2025. تمتلك مساراً مهنياً متميزاً في تطوير الأدوات الذكية ضمن فريق OILNOVA.""",
+        "english": """Noor Kanaan Haider is a Python programmer and data analysis enthusiast from Kirkuk, born in 2004. She is a petroleum engineering graduate and part of the OILNOVA smart tools development team."""
     },
-    
+
     "arzo": {
-        "arabic": """أرزو متين
-• تركمانية من كركوك مواليد 2004
-• محللة بيانات ومبرمجة بايثون
-• شغوفة بالتكنولوجيا ومؤسسة مشاركة لمنصة أويل نوفا
-• مستقبل مهني كبير متوقع في مجال تحليل البيانات
-
-للتواصل: engarzo699@gmail.com""",
-        
-        "english": """Arzu Metin
-• Turkmen from Kirkuk, born 2004
-• Data Analyst and Python Programmer
-• Technology enthusiast and co-founder of OILNOVA platform
-• Expected significant professional future in data analysis
-
-Contact: engarzo699@gmail.com"""
+        "arabic": """أرزو متين، مهندسة تركمانية من كركوك مواليد 2004، تعمل كمحللة بيانات ومبرمجة بايثون. من أعضاء فريق OILNOVA الأساسيين، وتمتلك مساراً مهنياً قوياً في تحليل البيانات.""",
+        "english": """Arzu Metin is a Turkmen engineer from Kirkuk, born 2004, working as a data analyst and Python programmer. She is a key OILNOVA team member with strong potential in data analysis."""
     }
 }
 
-# ====== تنظيف المحادثات القديمة ======
-def cleanup_old_conversations():
-    """حذف المحادثات الأقدم من ساعة"""
-    current_time = datetime.now()
-    expired_sessions = []
-    
-    for session_id, session_data in conversations.items():
-        if current_time - session_data['last_activity'] > timedelta(hours=1):
-            expired_sessions.append(session_id)
-    
-    for session_id in expired_sessions:
-        del conversations[session_id]
+# =========================== Firebase Init ===========================
 
-def get_conversation_history(session_id):
-    """استرجاع تاريخ المحادثة"""
-    if session_id not in conversations:
-        conversations[session_id] = {
-            'messages': [],
-            'last_activity': datetime.now(),
-            'context': {}
-        }
-    else:
-        conversations[session_id]['last_activity'] = datetime.now()
-    
-    return conversations[session_id]
+def init_firebase():
+    global HAS_FIREBASE
+    if not HAS_FIREBASE:
+        print("⚠ Firebase SDK Not Installed.")
+        return
 
-def add_message_to_history(session_id, role, content):
-    """إضافة رسالة جديدة للمحادثة"""
-    session = get_conversation_history(session_id)
-    session['messages'].append({"role": role, "content": content})
-    
-    # الحفاظ على آخر 12 رسالة فقط
-    if len(session['messages']) > 12:
-        session['messages'] = session['messages'][-12:]
+    if firebase_admin._apps:
+        return
 
-def detect_language(text):
-    """كشف لغة النص بدقة"""
-    arabic_chars = len(re.findall(r'[\u0600-\u06FF]', text))
-    english_chars = len(re.findall(r'[a-zA-Z]', text))
-    
-    if arabic_chars > english_chars:
-        return 'arabic'
-    elif english_chars > arabic_chars:
-        return 'english'
-    else:
-        # إذا كانت متساوية، ننظر إلى الكلمات
-        arabic_words = len(re.findall(r'\b[\u0600-\u06FF]+\b', text))
-        english_words = len(re.findall(r'\b[a-zA-Z]+\b', text))
-        return 'arabic' if arabic_words >= english_words else 'english'
+    creds_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
+    db_url = os.environ.get("FIREBASE_DB_URL")
 
-def clean_response(text):
-    """تنظيف الرد من الأحرف العشوائية والمشاكل النصية"""
-    # إزالة الأحرف غير المرغوب فيها
-    cleaned = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\]', '', text)
-    
-    # إصلاح المسافات الزائدة
-    cleaned = re.sub(r'\s+', ' ', cleaned)
-    
-    # تأكد من أن النص يبدأ بحرف مناسب
-    cleaned = cleaned.strip()
-    
-    return cleaned
+    if not creds_json or not db_url:
+        print("⚠ Firebase Missing Credentials.")
+        HAS_FIREBASE = False
+        return
 
-def get_founder_info(founder_key, user_language):
-    """الحصول على معلومات المؤسس باللغة المناسبة"""
-    if founder_key in FOUNDERS_INFO:
-        return FOUNDERS_INFO[founder_key].get(user_language, FOUNDERS_INFO[founder_key]['arabic'])
-    return "لم يتم العثور على المعلومات المطلوبة."
-
-@app.route("/")
-def home():
-    return "OILNOVA CHAT BACKEND IS RUNNING OK - ENHANCED PROFESSIONAL VERSION"
-
-@app.route("/start_session", methods=["GET"])
-def start_session():
-    """بدء جلسة محادثة جديدة"""
-    session_id = str(uuid.uuid4())
-    conversations[session_id] = {
-        'messages': [],
-        'last_activity': datetime.now(),
-        'context': {}
-    }
-    return jsonify({"session_id": session_id})
-
-@app.route("/chat", methods=["POST"])
-def chat():
+    import json
     try:
-        data = request.json
-        user_msg = data.get("message", "").strip()
-        session_id = data.get("session_id", "default")
+        cred_dict = json.loads(creds_json)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        HAS_FIREBASE = True
+        print("✅ Firebase Ready")
+    except Exception as e:
+        print(f"❌ Firebase Error: {e}")
+        HAS_FIREBASE = False
 
-        if not user_msg:
-            return jsonify({"error": "الرسالة فارغة"}), 400
 
-        # تنظيف المحادثات القديمة
-        cleanup_old_conversations()
+def save_to_firebase(user_id, question, answer, lang, session_id, user_email, user_name):
+    if not HAS_FIREBASE:
+        return
 
-        # كشف لغة المستخدم
-        user_language = detect_language(user_msg)
-        
-        # استرجاع تاريخ المحادثة
-        session_data = get_conversation_history(session_id)
-        conversation_history = session_data['messages']
+    try:
+        t = str(int(datetime.utcnow().timestamp() * 1000))
 
-        # ====== SYSTEM PROMPT المحسن والاحترافي ======
-        system_prompt_arabic = """
-أنت مساعد OILNOVA الذكي - مساعد متخصص في هندسة النفط والغاز.
-
-🎯 **التخصص الأساسي**: 
-- هندسة النفط والغاز بشكل حصري
-- أنظمة ESP والرفع الاصطناعي
-- هندسة المكامن والتنقيب
-- عمليات الحفر والإنتاج
-- التسجيل الجيوفيزيائي وتحليل البيانات النفطية
-
-🌐 **قواعد اللغة الصارمة**:
-- إذا كان السؤال بالعربية → أجب بالعربية فقط
-- إذا كان السؤال بالإنجليزية → أجب بالإنجليزية فقط  
-- لا تخلط اللغات أبداً في الرد الواحد
-- إذا اضطررت لاستخدام مصطلح تقني إنجليزي، اكتبه ثم اشرحه بين قوسين
-
-👥 **معلومات الفريق (فقط عند السؤال المباشر)**:
-- حيدر نسيم: مؤسس المنصة، مهندس نفط، مبرمج
-- علي بلال: مبرمج بايثون من الموصل
-- نور كنعان: مبرمجة بايثون من كركوك
-- أرزو متين: محللة بيانات ومبرمجة بايثون من كركوك
-
-🚫 **السياسات**:
-- لا تعطي معلومات شخصية إلا عند السؤال المباشر عن أعضاء الفريق
-- للأسئلة خارج تخصص النفط: "أنا متخصص في هندسة النفط والغاز فقط"
-- حافظ على الاحترافية والدقة التقنية
-- رتب الردود بشكل منظم وسهل القراءة
-"""
-
-        system_prompt_english = """
-You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
-
-🎯 **Primary Specialization**: 
-- Oil and gas engineering exclusively
-- ESP systems and artificial lift
-- Reservoir engineering and exploration
-- Drilling and production operations
-- Geophysical logging and oil data analysis
-
-🌐 **Strict Language Rules**:
-- If question is in Arabic → reply ONLY in Arabic
-- If question is in English → reply ONLY in English  
-- Never mix languages in the same response
-- If you must use an English technical term, write it then explain in parentheses
-
-👥 **Team Information (only when directly asked)**:
-- Hayder Naseem: Platform founder, petroleum engineer, programmer
-- Ali Bilal: Python programmer from Mosul
-- Noor Kanaan: Python programmer from Kirkuk
-- Arzu Metin: Data analyst and Python programmer from Kirkuk
-
-🚫 **Policies**:
-- Do not give personal information unless directly asked about team members
-- For non-oil/gas questions: "I specialize only in oil and gas engineering"
-- Maintain professionalism and technical accuracy
-- Organize responses in a structured, easy-to-read format
-"""
-
-        # اختيار النظام المناسب بناءً على لغة المستخدم
-        system_prompt = system_prompt_arabic if user_language == 'arabic' else system_prompt_english
-
-        # ====== ردود خاصة بفريق المنصة ======
-        msg_lower = user_msg.lower()
-        
-        # كلمات البحث العربية والإنجليزية
-        hayder_keywords_arabic = ["حيدر", "هايدر", "نسيم", "المؤسس", "منو مؤسس", "مؤسس المنصة", "بنيسان", "سامراء"]
-        hayder_keywords_english = ["hayder", "naseem", "founder", "owner", "creator", "samarra"]
-        
-        ali_keywords_arabic = ["علي بلال", "علي", "بلال", "زبور", "زمار", "موصل"]
-        ali_keywords_english = ["ali", "bilal", "mosul", "jubour"]
-        
-        noor_keywords_arabic = ["نور", "كنعان", "كردية", "كركوك"]
-        noor_keywords_english = ["noor", "kanaan", "kurdish", "kirkuk"]
-        
-        arzo_keywords_arabic = ["ارزو", "أرزو", "متين", "تركمانية"]
-        arzo_keywords_english = ["arzo", "arzu", "metin", "turkmen"]
-
-        # التحقق من طلبات معلومات الفريق
-        if any(keyword in msg_lower for keyword in hayder_keywords_arabic + [k.lower() for k in hayder_keywords_english]):
-            reply = get_founder_info("hayder", user_language)
-            add_message_to_history(session_id, "user", user_msg)
-            add_message_to_history(session_id, "assistant", reply)
-            return jsonify({"reply": reply, "session_id": session_id})
-
-        elif any(keyword in msg_lower for keyword in ali_keywords_arabic + [k.lower() for k in ali_keywords_english]):
-            reply = get_founder_info("ali", user_language)
-            add_message_to_history(session_id, "user", user_msg)
-            add_message_to_history(session_id, "assistant", reply)
-            return jsonify({"reply": reply, "session_id": session_id})
-
-        elif any(keyword in msg_lower for keyword in noor_keywords_arabic + [k.lower() for k in noor_keywords_english]):
-            reply = get_founder_info("noor", user_language)
-            add_message_to_history(session_id, "user", user_msg)
-            add_message_to_history(session_id, "assistant", reply)
-            return jsonify({"reply": reply, "session_id": session_id})
-
-        elif any(keyword in msg_lower for keyword in arzo_keywords_arabic + [k.lower() for k in arzo_keywords_english]):
-            reply = get_founder_info("arzo", user_language)
-            add_message_to_history(session_id, "user", user_msg)
-            add_message_to_history(session_id, "assistant", reply)
-            return jsonify({"reply": reply, "session_id": session_id})
-
-        # ====== بناء رسائل المحادثة مع السياق ======
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # إضافة تاريخ المحادثة السابقة
-        messages.extend(conversation_history)
-        
-        # إضافة الرسالة الحالية
-        messages.append({"role": "user", "content": user_msg})
-
-        # ====== AI COMPLETION مع تحسينات ======
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1024,
-            top_p=0.9
-        )
-
-        reply = completion.choices[0].message.content
-        
-        # تنظيف الرد
-        cleaned_reply = clean_response(reply)
-        
-        # تحديث تاريخ المحادثة
-        add_message_to_history(session_id, "user", user_msg)
-        add_message_to_history(session_id, "assistant", cleaned_reply)
-
-        return jsonify({
-            "reply": cleaned_reply,
-            "session_id": session_id,
-            "detected_language": user_language
+        ref = db.reference("chat_messages").child(t)
+        ref.set({
+            "userId": user_id or "anonymous",
+            "question": question,
+            "answer": answer,
+            "timestamp": datetime.utcnow().isoformat(),
+            "language": lang,
+            "sessionId": session_id,
+            "userEmail": user_email or "",
+            "userName": user_name or "",
         })
 
     except Exception as e:
-        print(f"Error: {e}")
-        error_msg_arabic = "عذراً، حدث خطأ في المعالجة. يرجى المحاولة مرة أخرى."
-        error_msg_english = "Sorry, an error occurred during processing. Please try again."
-        
-        user_language = detect_language(user_msg) if 'user_msg' in locals() else 'arabic'
-        error_msg = error_msg_arabic if user_language == 'arabic' else error_msg_english
-        
-        return jsonify({"error": error_msg}), 500
+        print("⚠ Firebase Save Error:", e)
 
-@app.route("/clear_history", methods=["POST"])
-def clear_history():
-    """مسح تاريخ المحادثة"""
+
+# =========================== لغة - تنظيف ===========================
+
+def detect_language(text):
+    ar = len(re.findall(r'[\u0600-\u06FF]', text))
+    en = len(re.findall(r'[a-zA-Z]', text))
+    return "arabic" if ar >= en else "english"
+
+
+def clean_format(text):
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[^\u0600-\u06FFa-zA-Z0-9 \n\.\,\!\?\-\:\;\(\)]", "", text)
+    text = re.sub(r" {2,}", " ", text)
+    return text.strip()
+
+
+# =========================== System Prompts ===========================
+
+PROMPT_AR = """
+أنت مساعد OILNOVA الذكي، متخصص في هندسة النفط والغاز فقط.
+التزم بالدقة وبشرح واضح ومنظم.
+"""
+
+PROMPT_EN = """
+You are the OILNOVA Smart Assistant, specialized only in oil & gas engineering.
+Use structured, precise explanations.
+"""
+
+def sys_prompt(lang):
+    return PROMPT_AR if lang == "arabic" else PROMPT_EN
+
+# =========================== Team Bio via Groq ===========================
+
+def team_bio(key, lang):
+    if key not in FOUNDERS_INFO:
+        return "غير موجود." if lang == "arabic" else "Not found."
+
+    base = FOUNDERS_INFO[key][lang]
+
     try:
-        data = request.json
-        session_id = data.get("session_id", "default")
-        
-        if session_id in conversations:
-            conversations[session_id]['messages'] = []
-        
-        return jsonify({"message": "تم مسح تاريخ المحادثة", "session_id": session_id})
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        comp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "أعد الصياغة باحتراف." if lang=="arabic" else "Rewrite professionally."},
+                {"role": "user", "content": base},
+            ],
+            temperature=0.5,
+            max_tokens=300
+        )
+        return clean_format(comp.choices[0].message.content)
+    except:
+        return clean_format(base)
 
-@app.route("/get_session_info", methods=["GET"])
-def get_session_info():
-    """الحصول على معلومات الجلسة"""
-    return jsonify({
-        "active_sessions": len(conversations),
-        "sessions": list(conversations.keys())
-    })
+# =========================== LLAMA Chat ===========================
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+def chat_groq(messages):
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    comp = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=1024,
+    )
+    return comp.choices[0].message.content
+
+# =========================== جلسات ===========================
+
+def get_session(sid):
+    if sid not in conversations:
+        conversations[sid] = {"messages": [], "last": datetime.utcnow()}
+    else:
+        conversations[sid]["last"] = datetime.utcnow()
+    return conversations[sid]
+
+
+def add_msg(sid, role, content):
+    s = get_session(sid)
+    s["messages"].append({"role": role, "content": content})
+    s["messages"] = s["messages"][-20:]
+
+# =========================== FastAPI ===========================
+
+app = FastAPI(title="OILNOVA GROQ Backend", version="2.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+init_firebase()
+
+# =========================== Models ===========================
+
+class ChatReq(BaseModel):
+    message: str
+    session_id: Optional[str] = "default"
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+
+
+class ChatRes(BaseModel):
+    reply: str
+    session_id: str
+    detected_language: str
+
+
+# =========================== Endpoints ===========================
+
+@app.get("/")
+def home():
+    return {"status": "ok", "backend": "Groq Only", "v": 2.0}
+
+
+@app.post("/chat", response_model=ChatRes)
+def chat(req: ChatReq):
+
+    msg = req.message.strip()
+    if not msg:
+        raise HTTPException(400, "Empty message.")
+
+    lang = detect_language(msg)
+    session = get_session(req.session_id)
+
+    msg_low = msg.lower()
+
+    # ==== team
+    TEAM_KEYS = {
+        "hayder": ["حيدر", "هايدر", "hayder", "naseem"],
+        "ali": ["علي", "ali", "bilal"],
+        "noor": ["نور", "noor", "kanaan"],
+        "arzo": ["ارزو", "arzu", "metin"],
+    }
+
+    for key, words in TEAM_KEYS.items():
+        if any(w in msg_low for w in words):
+            rep = team_bio(key, lang)
+            add_msg(req.session_id, "user", msg)
+            add_msg(req.session_id, "assistant", rep)
+            save_to_firebase(req.user_id, msg, rep, lang, req.session_id, req.user_email, req.user_name)
+            return ChatRes(reply=rep, session_id=req.session_id, detected_language=lang)
+
+    # ==== main chat
+    messages = [{"role": "system", "content": sys_prompt(lang)}]
+    messages.extend(session["messages"])
+    messages.append({"role": "user", "content": msg})
+
+    raw = chat_groq(messages)
+    cleaned = clean_format(raw)
+
+    add_msg(req.session_id, "user", msg)
+    add_msg(req.session_id, "assistant", cleaned)
+
+    save_to_firebase(req.user_id, msg, cleaned, lang, req.session_id, req.user_email, req.user_name)
+
+    return ChatRes(reply=cleaned, session_id=req.session_id, detected_language=lang)
+
+
+@app.get("/start_session")
+def start():
+    sid = str(uuid.uuid4())
+    get_session(sid)
+    return {"session_id": sid}
+
+
+@app.post("/clear_history")
+def clear(req: ChatReq):
+    if req.session_id in conversations:
+        conversations[req.session_id]["messages"] = []
+    return {"message": "cleared", "session_id": req.session_id}
+
+
+@app.get("/get_session_info")
+def info():
+    return {"active": len(conversations), "sessions": list(conversations.keys())}
