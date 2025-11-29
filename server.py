@@ -1,404 +1,291 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import os
+import re
 import uuid
 from datetime import datetime, timedelta
-import re
+from typing import List, Optional, Dict, Any
 
-app = Flask(__name__)
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# ====== CORS FIX ======
-CORS(app, resources={
-    r"/*": {
-        "origins": ["https://petroai-iq.web.app", "*"],
-        "methods": ["POST", "GET", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+# =========================== GROQ ONLY ===========================
+from groq import Groq
 
-# ====== تخزين المحادثات ======
-conversations = {}
+# =========================== Firebase ===========================
+HAS_FIREBASE = False
+try:
+    import firebase_admin
+    from firebase_admin import credentials, db
+    HAS_FIREBASE = True
+except ImportError:
+    firebase_admin = None
 
-# ====== معلومات الفريق المحسنة ======
+# =========================== إعداد CORS ===========================
+
+FRONTEND_ORIGINS = [
+    "https://petroai-iq.web.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "*",
+]
+
+# =========================== الجلسات ===========================
+
+conversations: Dict[str, Dict[str, Any]] = {}
+
+# =========================== معلومات الفريق ===========================
+
 FOUNDERS_INFO = {
     "hayder": {
-        "arabic": {
-            "name": "حيدر نسيم السامرائي",
-            "role": "مؤسس منصة OILNOVA",
-            "background": "مهندس نفط، محلل بيانات، مبرمج فرونت إند و Firebase باك إند",
-            "education": "خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط 2025",
-            "heritage": "من عشيرة السادة البنيسان الحسنية في سامراء",
-            "achievement": "أسس أويل نوفا كأول منصة عربية نفطية تستخدم الذكاء الاصطناعي",
-            "contact": "haydernaseem02@gmail.com"
-        },
-        "english": {
-            "name": "Hayder Naseem Al-Samarrai",
-            "role": "Founder of OILNOVA Platform", 
-            "background": "Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer",
-            "education": "Graduate of Kirkuk University / College of Engineering / Petroleum Engineering Dept. 2025",
-            "heritage": "Descendant of Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra",
-            "achievement": "Founded OILNOVA as the first Arabic oil platform using AI technologies",
-            "contact": "haydernaseem02@gmail.com"
-        }
+        "arabic": """المهندس حيدر نسيم السامرائي، مهندس نفط ومحلل بيانات ومبرمج واجهات أمامية ومطور Firebase كباك إند. خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط لعام 2025، ومن عشيرة السادة البنيسان الحسنية في سامراء. أسس منصة OILNOVA كأحد أوائل المنصات العربية النفطية التي تعتمد على تقنيات الذكاء الاصطناعي لخدمة قطاع النفط والغاز.""",
+        "english": """Engineer Hayder Naseem Al-Samarrai is a petroleum engineer, data analyst, and frontend developer with Firebase backend experience. He graduated from Kirkuk University, College of Engineering, Petroleum Engineering Department (2025), and belongs to Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra. He founded the OILNOVA platform as one of the first Arabic oil and gas platforms powered by AI technologies."""
     },
-    
+
     "ali": {
-        "arabic": {
-            "name": "علي بلال عبدالله خلف",
-            "role": "مبرمج بايثون ومطور تقني",
-            "background": "شغوف بمجال التكنولوجيا والبرمجة",
-            "education": "خريج هندسة النفط",
-            "heritage": "من مدينة الموصل / ناحية زمار / عشيرة الجبور",
-            "birth": "مواليد 2001",
-            "contact": "ali.bilalabdullahkhalaf@gmail.com"
-        },
-        "english": {
-            "name": "Ali Bilal Abdullah Khalaf",
-            "role": "Python Programmer and Tech Developer",
-            "background": "Passionate about technology and programming",
-            "education": "Petroleum Engineering Graduate", 
-            "heritage": "From Mosul City / Al-Zumar District / Al-Jubour Tribe",
-            "birth": "Born 2001",
-            "contact": "ali.bilalabdullahkhalaf@gmail.com"
-        }
-    }
-}
-
-# ====== قاعدة بيانات الأسئلة الشائعة ======
-OIL_GAS_KNOWLEDGE = {
-    "arabic": {
-        "drilling": """🛢️ **تقنيات الحفر الحديثة**
-
-• **الحفر الأفقي**: يزيد مساحة التماس مع المكمن
-• **الحرمائي**: يستخدم البخار لاستخراج النفط الثقيل  
-• **التكسير الهيدروليكي**: لزيادة نفاذية الصخور
-• **الحفر البحري**: في المياه العميقة
-
-**المعدات المتطورة**:
-١. أنظمة الحفر الآلي
-٢. مستشعرات الوقت الحقيقي
-٣. طفالات الحفر الذكية""",
-
-        "production": """⚡ **تحسين إنتاجية الحقول النفطية**
-
-**استراتيجيات التحسين**:
-• تحسين أنظمة الرفع الاصطناعي (ESP)
-• حقن الغاز أو الماء للحفاظ على الضغط
-• استخدام المحفزات الكيميائية
-• المراقبة المستمرة لأداء الآبار
-
-**نتائج التحسين**:
-١. زيادة معدل الاستخراج
-٢. إطالة عمر الحقل
-٣. تقليل التكاليف""",
-
-        "esp": """🔧 **أنظمة المضخات الغاطسة (ESP)**
-
-**مكونات النظام**:
-• المضخة الغاطسة
-• المحرك الكهربائي
-• كابلات القدرة
-• أنظمة التحكم
-
-**مميزات ESP**:
-١. كفاءة عالية في الإنتاج
-٢. مناسبة للآبار العميقة
-٣. سعة إنتاجية كبيرة""",
-
-        "reservoir": """🏭 **هندسة المكامن**
-
-**أنواع المكامن**:
-• مكامن رملية
-• مكامن كربونات
-• مكامن صخرية
-
-**تقنيات التقييم**:
-١. التسجيل الجيوفيزيائي
-٢. تحليل البيانات الزلزالية
-٣. نمذجة المكامن ثلاثية الأبعاد"""
+        "arabic": """علي بلال عبدالله خلف، مبرمج بايثون شغوف بالتكنولوجيا ومن مدينة الموصل / ناحية زمار / عشيرة الجبور. خريج هندسة نفط. يساهم في تطوير الأنظمة الذكية والبرمجيات داخل منصة OILNOVA.""",
+        "english": """Ali Bilal Abdullah Khalaf is a Python programmer passionate about technology, from Mosul/Al-Zumar district. He is a petroleum engineering graduate contributing to backend and smart tools development inside OILNOVA."""
     },
-    "english": {
-        "drilling": """🛢️ **Modern Drilling Technologies**
 
-• **Horizontal Drilling**: Increases reservoir contact area
-• **Thermal Recovery**: Uses steam for heavy oil extraction  
-• **Hydraulic Fracturing**: Enhances rock permeability
-• **Offshore Drilling**: In deepwater environments
+    "noor": {
+        "arabic": """نور كنعان حيدر، مبرمجة بايثون وشغوفة بتحليل البيانات، كردية من كركوك من مواليد 2004 وخريجة هندسة نفط لعام 2025. تمتلك مساراً مهنياً متميزاً في تطوير الأدوات الذكية ضمن فريق OILNOVA.""",
+        "english": """Noor Kanaan Haider is a Python programmer and data analysis enthusiast from Kirkuk, born in 2004. She is a petroleum engineering graduate and part of the OILNOVA smart tools development team."""
+    },
 
-**Advanced Equipment**:
-1. Automated drilling systems
-2. Real-time sensors
-3. Smart drilling fluids""",
-
-        "production": """⚡ **Improving Oil Field Productivity**
-
-**Optimization Strategies**:
-• Enhance artificial lift systems (ESP)
-• Implement gas/water injection for pressure maintenance
-• Use chemical stimulants
-• Continuous well performance monitoring
-
-**Expected Results**:
-1. Increased recovery rates
-2. Extended field life
-3. Reduced operational costs""",
-
-        "esp": """🔧 **Electrical Submersible Pump (ESP) Systems**
-
-**System Components**:
-• Submersible pump
-• Electric motor
-• Power cables
-• Control systems
-
-**ESP Advantages**:
-1. High production efficiency
-2. Suitable for deep wells
-3. Large production capacity""",
-
-        "reservoir": """🏭 **Reservoir Engineering**
-
-**Reservoir Types**:
-• Sandstone reservoirs
-• Carbonate reservoirs
-• Shale formations
-
-**Evaluation Techniques**:
-1. Geophysical logging
-2. Seismic data analysis
-3. 3D reservoir modeling"""
+    "arzo": {
+        "arabic": """أرزو متين، مهندسة تركمانية من كركوك مواليد 2004، تعمل كمحللة بيانات ومبرمجة بايثون. من أعضاء فريق OILNOVA الأساسيين، وتمتلك مساراً مهنياً قوياً في تحليل البيانات.""",
+        "english": """Arzu Metin is a Turkmen engineer from Kirkuk, born 2004, working as a data analyst and Python programmer. She is a key OILNOVA team member with strong potential in data analysis."""
     }
 }
 
-def detect_language(text):
-    """كشف لغة النص بدقة"""
-    arabic_chars = len(re.findall(r'[\u0600-\u06FF]', text))
-    english_chars = len(re.findall(r'[a-zA-Z]', text))
-    
-    if arabic_chars > english_chars:
-        return 'arabic'
-    elif english_chars > arabic_chars:
-        return 'english'
-    else:
-        arabic_words = len(re.findall(r'\b[\u0600-\u06FF]+\b', text))
-        english_words = len(re.findall(r'\b[a-zA-Z]+\b', text))
-        return 'arabic' if arabic_words >= english_words else 'english'
+# =========================== Firebase Init ===========================
 
-def convert_english_numbers_to_arabic(text):
-    """تحويل الأرقام الإنجليزية إلى عربية"""
-    number_map = {
-        '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
-        '5': '٥', '6': '٦', '7': '٧', '8': '٨', '9': '٩'
-    }
-    
-    for eng_num, arabic_num in number_map.items():
-        text = text.replace(eng_num, arabic_num)
-    
-    return text
+def init_firebase():
+    global HAS_FIREBASE
+    if not HAS_FIREBASE:
+        print("⚠ Firebase SDK Not Installed.")
+        return
 
-def format_arabic_text(text):
-    """تنسيق النص العربي بشكل احترافي"""
-    text = convert_english_numbers_to_arabic(text)
-    
-    lines = text.split('\n')
-    formatted_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            formatted_lines.append('')
-            continue
-            
-        if re.match(r'^\d+\.', line):
-            line = re.sub(r'^(\d+)\.', r' \1.', line)
-            line = convert_english_numbers_to_arabic(line)
-        
-        elif re.match(r'^[-•*]', line):
-            line = re.sub(r'^[-•*]\s*', '• ', line)
-        
-        formatted_lines.append(line)
-    
-    formatted_text = '\n'.join(formatted_lines)
-    formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
-    formatted_text = re.sub(r' +', ' ', formatted_text)
-    
-    return formatted_text.strip()
+    if firebase_admin._apps:
+        return
 
-def format_english_text(text):
-    """تنسيق النص الإنجليزي بشكل احترافي"""
-    lines = text.split('\n')
-    formatted_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            formatted_lines.append('')
-            continue
-            
-        if re.match(r'^\d+\.', line):
-            line = re.sub(r'^(\d+)\.', r'\1. ', line)
-        
-        elif re.match(r'^[-•*]', line):
-            line = re.sub(r'^[-•*]\s*', '- ', line)
-        
-        formatted_lines.append(line)
-    
-    formatted_text = '\n'.join(formatted_lines)
-    formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
-    formatted_text = re.sub(r' +', ' ', formatted_text)
-    
-    return formatted_text.strip()
+    creds_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
+    db_url = os.environ.get("FIREBASE_DB_URL")
 
-def format_final_response(text, language):
-    """تنسيق الرد النهائي بشكل احترافي"""
-    if not text:
-        return text
-    
-    text = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\\n]', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    
-    if language == 'arabic':
-        return format_arabic_text(text)
-    else:
-        return format_english_text(text)
+    if not creds_json or not db_url:
+        print("⚠ Firebase Missing Credentials.")
+        HAS_FIREBASE = False
+        return
 
-def rewrite_team_member_info(member_key, language):
-    """إعادة كتابة معلومات أعضاء الفريق بشكل طبيعي وسلس"""
-    if member_key not in FOUNDERS_INFO:
-        return "لم يتم العثور على المعلومات المطلوبة." if language == 'arabic' else "Requested information not found."
-    
-    member_info = FOUNDERS_INFO[member_key][language]
-    
-    if language == 'arabic':
-        if member_key == "hayder":
-            return f"""🛢️ **{member_info['name']}** - {member_info['role']}
-
-{member_info['background']}، {member_info['education']}. {member_info['heritage']}، و{member_info['achievement']}.
-
-📧 **للتواصل**: {member_info['contact']}"""
-        
-        elif member_key == "ali":
-            return f"""👨‍💻 **{member_info['name']}**
-
-{member_info['role']} {member_info['background']}. {member_info['education']}، {member_info['heritage']} ({member_info['birth']}).
-
-📧 **للتواصل**: {member_info['contact']}"""
-    
-    else:  # English
-        if member_key == "hayder":
-            return f"""🛢️ **{member_info['name']}** - {member_info['role']}
-
-{member_info['background']}, {member_info['education']}. {member_info['heritage']}, and {member_info['achievement']}.
-
-📧 **Contact**: {member_info['contact']}"""
-        
-        elif member_key == "ali":
-            return f"""👨‍💻 **{member_info['name']}**
-
-{member_info['role']} who is {member_info['background']}. {member_info['education']} from {member_info['heritage']} ({member_info['birth']}).
-
-📧 **Contact**: {member_info['contact']}"""
-
-def get_oil_gas_response(user_message, language):
-    """إرجاع ردود ذكية بناءً على السؤال"""
-    msg_lower = user_message.lower()
-    
-    if language == "arabic":
-        if any(word in msg_lower for word in ["حفر", "حفار", "تقنيات الحفر", "drilling"]):
-            return OIL_GAS_KNOWLEDGE["arabic"]["drilling"]
-        elif any(word in msg_lower for word in ["إنتاج", "إنتاجية", "حقول", "production"]):
-            return OIL_GAS_KNOWLEDGE["arabic"]["production"]
-        elif any(word in msg_lower for word in ["مضخات", "غاطس", "esp", "مضخة"]):
-            return OIL_GAS_KNOWLEDGE["arabic"]["esp"]
-        elif any(word in msg_lower for word in ["مكمن", "مكامن", "reservoir"]):
-            return OIL_GAS_KNOWLEDGE["arabic"]["reservoir"]
-        else:
-            return """🛢️ **مساعد OILNOVA المتخصص**
-
-أنا متخصص في مجال هندسة النفط والغاز. يمكنني مساعدتك في:
-
-• **تقنيات الحفر** والإنتاج
-• **أنظمة المضخات الغاطسة (ESP)**
-• **هندسة المكامن** والاستكشاف
-• **تحسين إنتاجية** الحقول
-
-اطرح سؤالك التقني وسأجيبك بأفضل المعلومات!"""
-    
-    else:  # English
-        if any(word in msg_lower for word in ["drill", "drilling", "technolog"]):
-            return OIL_GAS_KNOWLEDGE["english"]["drilling"]
-        elif any(word in msg_lower for word in ["production", "productivity", "field"]):
-            return OIL_GAS_KNOWLEDGE["english"]["production"]
-        elif any(word in msg_lower for word in ["esp", "pump", "submersible"]):
-            return OIL_GAS_KNOWLEDGE["english"]["esp"]
-        elif any(word in msg_lower for word in ["reservoir", "formation"]):
-            return OIL_GAS_KNOWLEDGE["english"]["reservoir"]
-        else:
-            return """🛢️ **OILNOVA Specialized Assistant**
-
-I specialize in oil and gas engineering. I can help you with:
-
-• **Drilling technologies** and operations
-• **ESP systems** and artificial lift
-• **Reservoir engineering** and exploration
-• **Field productivity** optimization
-
-Ask your technical question and I'll provide the best information!"""
-
-@app.route("/")
-def home():
-    return "OILNOVA CHAT BACKEND IS RUNNING OK - ENHANCED PROFESSIONAL VERSION"
-
-@app.route("/chat", methods=["POST"])
-def chat():
+    import json
     try:
-        data = request.json
-        user_msg = data.get("message", "").strip()
-        session_id = data.get("session_id", "default")
+        cred_dict = json.loads(creds_json)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred, {"databaseURL": db_url})
+        HAS_FIREBASE = True
+        print("✅ Firebase Ready")
+    except Exception as e:
+        print(f"❌ Firebase Error: {e}")
+        HAS_FIREBASE = False
 
-        if not user_msg:
-            return jsonify({"error": "الرسالة فارغة"}), 400
 
-        user_language = detect_language(user_msg)
-        
-        # ====== التحقق من طلبات معلومات الفريق ======
-        msg_lower = user_msg.lower()
-        
-        hayder_keywords_arabic = ["حيدر", "هايدر", "نسيم", "المؤسس", "مؤسس"]
-        hayder_keywords_english = ["hayder", "naseem", "founder", "owner"]
-        
-        ali_keywords_arabic = ["علي بلال", "علي", "بلال"]
-        ali_keywords_english = ["ali", "bilal"]
+def save_to_firebase(user_id, question, answer, lang, session_id, user_email, user_name):
+    if not HAS_FIREBASE:
+        return
 
-        if any(keyword in msg_lower for keyword in hayder_keywords_arabic + [k.lower() for k in hayder_keywords_english]):
-            reply = rewrite_team_member_info("hayder", user_language)
-            return jsonify({"reply": reply, "session_id": session_id})
+    try:
+        t = str(int(datetime.utcnow().timestamp() * 1000))
 
-        elif any(keyword in msg_lower for keyword in ali_keywords_arabic + [k.lower() for k in ali_keywords_english]):
-            reply = rewrite_team_member_info("ali", user_language)
-            return jsonify({"reply": reply, "session_id": session_id})
-
-        # ====== الحصول على رد ذكي ======
-        ai_reply = get_oil_gas_response(user_msg, user_language)
-        
-        # ✅ تطبيق التنسيق المحسن
-        formatted_reply = format_final_response(ai_reply, user_language)
-
-        return jsonify({
-            "reply": formatted_reply,
-            "session_id": session_id,
-            "detected_language": user_language
+        ref = db.reference("chat_messages").child(t)
+        ref.set({
+            "userId": user_id or "anonymous",
+            "question": question,
+            "answer": answer,
+            "timestamp": datetime.utcnow().isoformat(),
+            "language": lang,
+            "sessionId": session_id,
+            "userEmail": user_email or "",
+            "userName": user_name or "",
         })
 
     except Exception as e:
-        print(f"Error: {e}")
-        error_msg_arabic = "عذراً، حدث خطأ في المعالجة. يرجى المحاولة مرة أخرى."
-        error_msg_english = "Sorry, an error occurred during processing. Please try again."
-        
-        user_language = detect_language(user_msg) if 'user_msg' in locals() else 'arabic'
-        error_msg = error_msg_arabic if user_language == 'arabic' else error_msg_english
-        
-        return jsonify({"error": error_msg}), 500
+        print("⚠ Firebase Save Error:", e)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+
+# =========================== لغة - تنظيف ===========================
+
+def detect_language(text):
+    ar = len(re.findall(r'[\u0600-\u06FF]', text))
+    en = len(re.findall(r'[a-zA-Z]', text))
+    return "arabic" if ar >= en else "english"
+
+
+def clean_format(text):
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[^\u0600-\u06FFa-zA-Z0-9 \n\.\,\!\?\-\:\;\(\)]", "", text)
+    text = re.sub(r" {2,}", " ", text)
+    return text.strip()
+
+
+# =========================== System Prompts ===========================
+
+PROMPT_AR = """
+أنت مساعد OILNOVA الذكي، متخصص في هندسة النفط والغاز فقط.
+التزم بالدقة وبشرح واضح ومنظم.
+"""
+
+PROMPT_EN = """
+You are the OILNOVA Smart Assistant, specialized only in oil & gas engineering.
+Use structured, precise explanations.
+"""
+
+def sys_prompt(lang):
+    return PROMPT_AR if lang == "arabic" else PROMPT_EN
+
+# =========================== Team Bio via Groq ===========================
+
+def team_bio(key, lang):
+    if key not in FOUNDERS_INFO:
+        return "غير موجود." if lang == "arabic" else "Not found."
+
+    base = FOUNDERS_INFO[key][lang]
+
+    try:
+        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        comp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "أعد الصياغة باحتراف." if lang=="arabic" else "Rewrite professionally."},
+                {"role": "user", "content": base},
+            ],
+            temperature=0.5,
+            max_tokens=300
+        )
+        return clean_format(comp.choices[0].message.content)
+    except:
+        return clean_format(base)
+
+# =========================== LLAMA Chat ===========================
+
+def chat_groq(messages):
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    comp = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=messages,
+        temperature=0.7,
+        max_tokens=1024,
+    )
+    return comp.choices[0].message.content
+
+# =========================== جلسات ===========================
+
+def get_session(sid):
+    if sid not in conversations:
+        conversations[sid] = {"messages": [], "last": datetime.utcnow()}
+    else:
+        conversations[sid]["last"] = datetime.utcnow()
+    return conversations[sid]
+
+
+def add_msg(sid, role, content):
+    s = get_session(sid)
+    s["messages"].append({"role": role, "content": content})
+    s["messages"] = s["messages"][-20:]
+
+# =========================== FastAPI ===========================
+
+app = FastAPI(title="OILNOVA GROQ Backend", version="2.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+init_firebase()
+
+# =========================== Models ===========================
+
+class ChatReq(BaseModel):
+    message: str
+    session_id: Optional[str] = "default"
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+
+
+class ChatRes(BaseModel):
+    reply: str
+    session_id: str
+    detected_language: str
+
+
+# =========================== Endpoints ===========================
+
+@app.get("/")
+def home():
+    return {"status": "ok", "backend": "Groq Only", "v": 2.0}
+
+
+@app.post("/chat", response_model=ChatRes)
+def chat(req: ChatReq):
+
+    msg = req.message.strip()
+    if not msg:
+        raise HTTPException(400, "Empty message.")
+
+    lang = detect_language(msg)
+    session = get_session(req.session_id)
+
+    msg_low = msg.lower()
+
+    # ==== team
+    TEAM_KEYS = {
+        "hayder": ["حيدر", "هايدر", "hayder", "naseem"],
+        "ali": ["علي", "ali", "bilal"],
+        "noor": ["نور", "noor", "kanaan"],
+        "arzo": ["ارزو", "arzu", "metin"],
+    }
+
+    for key, words in TEAM_KEYS.items():
+        if any(w in msg_low for w in words):
+            rep = team_bio(key, lang)
+            add_msg(req.session_id, "user", msg)
+            add_msg(req.session_id, "assistant", rep)
+            save_to_firebase(req.user_id, msg, rep, lang, req.session_id, req.user_email, req.user_name)
+            return ChatRes(reply=rep, session_id=req.session_id, detected_language=lang)
+
+    # ==== main chat
+    messages = [{"role": "system", "content": sys_prompt(lang)}]
+    messages.extend(session["messages"])
+    messages.append({"role": "user", "content": msg})
+
+    raw = chat_groq(messages)
+    cleaned = clean_format(raw)
+
+    add_msg(req.session_id, "user", msg)
+    add_msg(req.session_id, "assistant", cleaned)
+
+    save_to_firebase(req.user_id, msg, cleaned, lang, req.session_id, req.user_email, req.user_name)
+
+    return ChatRes(reply=cleaned, session_id=req.session_id, detected_language=lang)
+
+
+@app.get("/start_session")
+def start():
+    sid = str(uuid.uuid4())
+    get_session(sid)
+    return {"session_id": sid}
+
+
+@app.post("/clear_history")
+def clear(req: ChatReq):
+    if req.session_id in conversations:
+        conversations[req.session_id]["messages"] = []
+    return {"message": "cleared", "session_id": req.session_id}
+
+
+@app.get("/get_session_info")
+def info():
+    return {"active": len(conversations), "sessions": list(conversations.keys())}
