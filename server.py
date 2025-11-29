@@ -174,171 +174,106 @@ def convert_english_numbers_to_arabic(text):
     return text
 
 def enforce_list_formatting(text, language):
-    """تطبيق التنسيق الإجباري للقوائم - كل نقطة في سطر مستقل"""
+    """
+    تطبيق التنسيق الإجباري للقوائم:
+    - أي تعداد 1. 2. 3. يتم فصل كل نقطة في سطر مستقل
+    - وأي نقطة تبدأ بـ -, * , • كذلك
+    """
     if not text:
         return text
-    
-    # أنماط للتعرف على القوائم المرقمة والنقطية
-    numbered_pattern = r'(\d+\.\s*[^\n]+(?:\s*\d+\.\s*[^\n]+)*)'
-    bullet_pattern = r'([•\-*]\s*[^\n]+(?:\s*[•\-*]\s*[^\n]+)*)'
-    
-    def format_lists(text):
-        # معالجة القوائم المرقمة
-        def format_numbered(match):
-            content = match.group(0).strip()
-            # تقسيم إلى عناصر فردية
-            items = re.findall(r'\d+\.\s*[^\n]+', content)
-            formatted_items = []
-            for item in items:
-                item = item.strip()
-                # إضافة سطر جديد قبل كل نقطة مرقمة
-                formatted_items.append('\n' + item)
-            return ''.join(formatted_items).strip()
-        
-        # معالجة القوائم النقطية
-        def format_bullet(match):
-            content = match.group(0).strip()
-            # تقسيم إلى عناصر فردية
-            items = re.findall(r'[•\-*]\s*[^\n]+', content)
-            formatted_items = []
-            for item in items:
-                item = item.strip()
-                # إضافة سطر جديد قبل كل نقطة
-                formatted_items.append('\n' + item)
-            return ''.join(formatted_items).strip()
-        
-        # تطبيق التنسيق على القوائم المرقمة
-        text = re.sub(numbered_pattern, format_numbered, text, flags=re.MULTILINE | re.DOTALL)
-        
-        # تطبيق التنسيق على القوائم النقطية
-        text = re.sub(bullet_pattern, format_bullet, text, flags=re.MULTILINE | re.DOTALL)
-        
-        return text
-    
-    # تطبيق التنسيق بشكل متكرر لضمان معالجة جميع القوائم
-    previous_text = ""
-    while text != previous_text:
-        previous_text = text
-        text = format_lists(text)
-    
-    # تنظيف المسافات الزائدة بين الأسطر
-    text = re.sub(r'\n\s*\n', '\n\n', text)
-    
+
+    # تحويل " 1. نص 2. نص" إلى:
+    # 1. نص
+    # 2. نص
+    text = re.sub(r'\s+(\d+)\.\s+', r'\n\1. ', text)
+
+    # تحويل " - نص  - نص" إلى كل نقطة بسطر
+    text = re.sub(r'\s+([•\-\*])\s+', r'\n\1 ', text)
+
+    # تنظيف التكرار في الأسطر
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
 def bold_important_words(text):
-    """إضافة تنسيق Bold للكلمات المهمة تلقائياً"""
+    """
+    جعل الكلمات المهمة Bold تلقائياً:
+    - مهم، ملاحظة، تنبيه
+    - Important, Note, Warning
+    - OILNOVA
+    """
     if not text:
         return text
-    
-    # الكلمات المهمة بالعربية والإنجليزية
+
     important_words = [
-        'مهم', 'ملاحظة', 'تنبيه', 'Important', 'Note', 'Warning'
+        'مهم', 'ملاحظة', 'تنبيه',
+        'Important', 'Note', 'Warning',
+        'OILNOVA', 'oilnova'
     ]
-    
+
     for word in important_words:
-        # البحث عن الكلمة متبوعة بنقطتين مع مسافات محتملة
-        pattern = rf'\b{re.escape(word)}\s*:'
-        replacement = f'**{word}:**'
-        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
-        
-        # أيضًا معالجتها إذا كانت في بداية السطر
-        pattern_start = rf'^\s*{re.escape(word)}\s*:'
-        replacement_start = f'**{word}:**'
-        text = re.sub(pattern_start, replacement_start, text, flags=re.IGNORECASE | re.MULTILINE)
-    
+        pattern = rf'\b{re.escape(word)}\b'
+        text = re.sub(
+            pattern,
+            lambda m: f"**{m.group(0)}**",
+            text,
+            flags=re.IGNORECASE
+        )
+
     return text
 
 def format_arabic_text(text):
-    """تنسيق النص العربي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    """تنسيق النص العربي بشكل احترافي مع التعداد والسولد"""
     if not text:
         return text
     
-    # تحويل الأرقام أولاً
+    # تحويل الأرقام
     text = convert_english_numbers_to_arabic(text)
-    
-    # تطبيق التنسيق الإجباري للقوائم
+    # تنسيق التعداد
     text = enforce_list_formatting(text, 'arabic')
-    
-    # إضافة تنسيق Bold للكلمات المهمة
+    # الكلمات المهمة سولد
     text = bold_important_words(text)
+
+    # تنظيف فراغات زائدة داخل الأسطر
+    lines = [re.sub(r' +', ' ', line.strip()) for line in text.split('\n')]
+    formatted_text = '\n'.join(lines)
     
-    lines = text.split('\n')
-    formatted_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            formatted_lines.append('')
-            continue
-            
-        # تحسين القوائم المرقمة (بعد التنسيق الإجباري)
-        if re.match(r'^\d+\.', line):
-            line = re.sub(r'^(\d+)\.', r'\1.', line)
-            line = convert_english_numbers_to_arabic(line)
-        
-        # تحسين النقاط النقطية
-        elif re.match(r'^[•]', line):
-            line = re.sub(r'^[•]\s*', '• ', line)
-        
-        formatted_lines.append(line)
-    
-    formatted_text = '\n'.join(formatted_lines)
-    
-    # التنظيف النهائي
+    # تنظيف أسطر فارغة متكررة
     formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
-    formatted_text = re.sub(r' +', ' ', formatted_text)
     
     return formatted_text.strip()
 
 def format_english_text(text):
-    """تنسيق النص الإنجليزي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    """تنسيق النص الإنجليزي بشكل احترافي مع التعداد والسولد"""
     if not text:
         return text
     
-    # تطبيق التنسيق الإجباري للقوائم أولاً
+    # تنسيق التعداد
     text = enforce_list_formatting(text, 'english')
-    
-    # إضافة تنسيق Bold للكلمات المهمة
+    # الكلمات المهمة سولد
     text = bold_important_words(text)
+
+    # تنظيف فراغات زائدة داخل الأسطر
+    lines = [re.sub(r' +', ' ', line.strip()) for line in text.split('\n')]
+    formatted_text = '\n'.join(lines)
     
-    lines = text.split('\n')
-    formatted_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            formatted_lines.append('')
-            continue
-            
-        # تحسين القوائم المرقمة (بعد التنسيق الإجباري)
-        if re.match(r'^\d+\.', line):
-            line = re.sub(r'^(\d+)\.', r'\1. ', line)
-        
-        # تحسين النقاط النقطية
-        elif re.match(r'^[-]', line):
-            line = re.sub(r'^[-]\s*', '- ', line)
-        
-        formatted_lines.append(line)
-    
-    formatted_text = '\n'.join(formatted_lines)
-    
-    # التنظيف النهائي
+    # تنظيف أسطر فارغة متكررة
     formatted_text = re.sub(r'\n\s*\n', '\n\n', formatted_text)
-    formatted_text = re.sub(r' +', ' ', formatted_text)
     
     return formatted_text.strip()
 
 def format_final_response(text, language):
-    """تنسيق الرد النهائي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    """تنسيق الرد النهائي بشكل احترافي مع الحفاظ على التعداد والسولد"""
     if not text:
         return text
+
+    # إزالة رموز غريبة فقط بدون حذف المسافات والأسطر
+    text = re.sub(
+        r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\\n]',
+        '',
+        text
+    )
     
-    # التنظيف الأساسي
-    text = re.sub(r'[^\u0600-\u06FFa-zA-Z0-9\s\.\,\!\?\-\:\;\(\)\%\&\"\'\@\#\$\*\+\=\/\<\>\[\]\\\n]', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    
-    # التنسيق حسب اللغة مع الالتزام بالتنسيق الإجباري
     if language == 'arabic':
         return format_arabic_text(text)
     else:
@@ -446,7 +381,7 @@ def chat():
 
         # ====== SYSTEM PROMPT المحسن والاحترافي مع التنسيق الإجباري ======
         system_prompt_arabic = """
-أنت مساعد OILNOVA الذكي - مساعد متخصص في هندسة النفط والغاز.
+أنت مساعد **OILNOVA** الذكي - مساعد متخصص في هندسة النفط والغاز.
 
 🎯 **التخصص الأساسي**: 
 - هندسة النفط والغاز بشكل حصري
@@ -486,7 +421,7 @@ def chat():
 """
 
         system_prompt_english = """
-You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
+You are **OILNOVA** Smart Assistant - specialized in oil and gas engineering.
 
 🎯 **Primary Specialization**: 
 - Oil and gas engineering exclusively
