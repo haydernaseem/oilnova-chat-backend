@@ -74,6 +74,7 @@ FOUNDERS_INFO = {
             "background": "شغوفة بمجال التكنولوجيا والبرمجة",
             "education": "خريجة هندسة النفط - جامعة كركوك 2025",
             "heritage": "كردية من كركوك",
+            "birth": "مواليد 2004", 
             "future": "مستقبل مهني مشرق في مجال البرمجة",
             "contact": "noorkanaanhaider@gmail.com"
         },
@@ -83,6 +84,7 @@ FOUNDERS_INFO = {
             "background": "Passionate about technology and programming",
             "education": "Petroleum Engineering Graduate - Kirkuk University 2025",
             "heritage": "Kurdish from Kirkuk",
+            "birth": "Born 2004",
             "future": "Promising professional future in programming field",
             "contact": "noorkanaanhaider@gmail.com"
         }
@@ -93,7 +95,7 @@ FOUNDERS_INFO = {
             "name": "أرزو متين",
             "role": "محللة بيانات ومبرمجة بايثون",
             "background": "شغوفة بالتكنولوجيا ومؤسسة مشاركة لمنصة أويل نوفا",
-            "heritage": "تركمانية من كركوك ",
+            "heritage": "تركمانية من كركوك مواليد 2004",
             "future": "مستقبل مهني كبير متوقع في مجال تحليل البيانات",
             "contact": "engarzo699@gmail.com"
         },
@@ -101,7 +103,7 @@ FOUNDERS_INFO = {
             "name": "Arzu Metin", 
             "role": "Data Analyst and Python Programmer",
             "background": "Technology enthusiast and co-founder of OILNOVA platform",
-            "heritage": "Turkmen from Kirkuk",
+            "heritage": "Turkmen from Kirkuk, born 2004",
             "future": "Expected significant professional future in data analysis",
             "contact": "engarzo699@gmail.com"
         }
@@ -331,7 +333,7 @@ def rewrite_team_member_info(member_key, language):
         elif member_key == "noor":
             return f"""👩‍💻 **{member_info['name']}**
 
-{member_info['role']} who is {member_info['background']}. {member_info['education']}, {member_info['heritage']} , with a {member_info['future']}.
+{member_info['role']} who is {member_info['background']}. {member_info['education']}, {member_info['heritage']} ({member_info['birth']}), with a {member_info['future']}.
 
 📧 **Contact**: {member_info['contact']}"""
         
