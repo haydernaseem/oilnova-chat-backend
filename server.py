@@ -29,31 +29,19 @@ FOUNDERS_INFO = {
         "arabic": {
             "name": "حيدر نسيم السامرائي",
             "role": "مؤسس منصة OILNOVA",
-            "background": "مهندس نفط، محلل بيانات، مبرمج فرونت إند و Firebase باك إند، مبرمج بايثون متخصص في الذكاء الاصطناعي وتعلم الآلة في مجال النفط",
+            "background": "مهندس نفط، محلل بيانات، مبرمج فرونت إند و Firebase باك إند",
             "education": "خريج جامعة كركوك / كلية الهندسة / قسم هندسة النفط 2025",
             "heritage": "من عشيرة السادة البنيسان الحسنية في سامراء",
             "achievement": "أسس أويل نوفا كأول منصة عربية نفطية تستخدم الذكاء الاصطناعي",
-            "skills": "مطور برامج نفطية متخصصة مثل: محاكي المكامن (Reservoir Simulator)، حاسبة IPR، محاكي SMOR",
-            "interests": "يركز على بناء مستقبله المهني والبحث عن جامعة عالمية لدراسة الماجستير",
-            "personality": "شخص صارم ومتحكم بمشاعره، يفضل مستقبله المهني على المشاعر الشخصية",
-            "priorities": "العائلة أولاً ثم المال - يركز على الجانب المالي بشكل كبير",
-            "work": "يعمل حالياً في مجال آخر بالإضافة إلى OILNOVA لكنه لا يفضل الإفصاح عن مكان العمل",
-            "contribution": "المساهم الرئيسي في منصة OILNOVA بنسبة 80% من التطوير",
             "contact": "haydernaseem02@gmail.com"
         },
         "english": {
             "name": "Hayder Naseem Al-Samarrai",
             "role": "Founder of OILNOVA Platform", 
-            "background": "Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer, Python programmer specialized in AI and Machine Learning for oil industry",
+            "background": "Petroleum Engineer, Data Analyst, Frontend & Firebase Backend Developer",
             "education": "Graduate of Kirkuk University / College of Engineering / Petroleum Engineering Dept. 2025",
             "heritage": "Descendant of Al-Sadah Al-Benisian Al-Hasaniyah tribe in Samarra",
             "achievement": "Founded OILNOVA as the first Arabic oil platform using AI technologies",
-            "skills": "Developer of specialized oil software: Reservoir Simulator, IPR Calculator, SMOR Simulator",
-            "interests": "Focused on building his professional career and seeking global university for Master's studies",
-            "personality": "Strict person who controls his emotions, prefers professional future over personal feelings",
-            "priorities": "Family first then money - focuses heavily on financial aspects",
-            "work": "Currently works in another field besides OILNOVA but prefers not to disclose workplace",
-            "contribution": "Main contributor to OILNOVA platform with 80% of development",
             "contact": "haydernaseem02@gmail.com"
         }
     },
@@ -329,21 +317,6 @@ def rewrite_team_member_info(member_key, language):
 
 {member_info['background']}، {member_info['education']}. {member_info['heritage']}، و{member_info['achievement']}.
 
-**🛠️ المهارات التقنية**:
-{member_info['skills']}
-
-**🎯 الاهتمامات والأهداف**:
-{member_info['interests']} - يطمح ليكون اسماً بارزاً في مجال النفط
-
-**👤 الشخصية**:
-{member_info['personality']} - يضع مستقبله المهني فوق كل الاعتبارات
-
-**💼 العمل الحالي**:
-{member_info['work']}
-
-**📊 المساهمة في OILNOVA**:
-{member_info['contribution']}
-
 📧 **للتواصل**: {member_info['contact']}"""
         
         elif member_key == "ali":
@@ -373,21 +346,6 @@ def rewrite_team_member_info(member_key, language):
 
 {member_info['background']}, {member_info['education']}. {member_info['heritage']}, and {member_info['achievement']}.
 
-**🛠️ Technical Skills**:
-{member_info['skills']}
-
-**🎯 Interests & Goals**:
-{member_info['interests']} - Aspires to become a prominent name in the oil industry
-
-**👤 Personality**:
-{member_info['personality']} - Puts his professional future above all considerations
-
-**💼 Current Work**:
-{member_info['work']}
-
-**📊 Contribution to OILNOVA**:
-{member_info['contribution']}
-
 📧 **Contact**: {member_info['contact']}"""
         
         elif member_key == "ali":
@@ -410,87 +368,6 @@ def rewrite_team_member_info(member_key, language):
 {member_info['role']} and {member_info['background']}. {member_info['heritage']}, with an {member_info['future']}.
 
 📧 **Contact**: {member_info['contact']}"""
-
-# ====== إضافة معالجة للأسئلة التفصيلية عن حيدر ======
-def handle_detailed_hayder_questions(user_message, language):
-    """معالجة الأسئلة التفصيلية عن حيدر"""
-    msg_lower = user_message.lower()
-    
-    if language == "arabic":
-        if any(word in msg_lower for word in ["عمر", "مواليد", "كم سنه", "عمر حيدر"]):
-            return "حيدر حذرني من الإفصاح عن مواليده أو عمره، لذلك لا يمكنني تقديم هذه المعلومة."
-        
-        elif any(word in msg_lower for word in ["معجب", "يحب", "علاقة", "بنت", "جامعة", "مشاعر", "حب"]):
-            return """حيدر شخص صارم ومتحكم بمشاعره.
-
-على الرغم من أنني واثق أنه معجب بشخص معين، إلا أنه يفضل مستقبله المهني على مشاعره.
-
-حيدر مهني جداً وصعب عليه أن يبين هذه الأمور، ولا أعتقد أنه يدخل في علاقات رسمية لأنه يطمح أن يكون اسمًا بارزاً في مجال النفط."""
-        
-        elif any(word in msg_lower for word in ["أهم", "أولويات", "أشياء", "يركز", "عائله", "مال"]):
-            return """أهم الأشياء عند حيدر بالترتيب:
-
-١. العائلة 
-٢. المال
-
-حيدر يركز على الجانب المالي بشكل كبير ويضع أهدافاً مالية واضحة لمستقبله."""
-        
-        elif any(word in msg_lower for word in ["يعمل", "وظيفة", "شغل", "مجال آخر"]):
-            return "نعم، حيدر يعمل حالياً في مجال آخر بالإضافة إلى OILNOVA، لكنه لا يقبل أن أقول أين يعمل بالضبط."
-        
-        elif any(word in msg_lower for word in ["ساهم", "مساهمة", "نسبة", "أكثر شخص", "مسؤول"]):
-            return "حيدر هو المساهم الرئيسي في منصة OILNOVA بنسبة 80% من التطوير والعمل على المشروع."
-        
-        elif any(word in msg_lower for word in ["اهتمامات", "يهتم", "يركز", "أهداف", "ماذا يحب"]):
-            return """اهتمامات حيدر الرئيسية:
-
-• بناء مستقبله المهني في مجال النفط والذكاء الاصطناعي
-• البحث عن جامعة عالمية لدراسة الماجستير
-• تطوير برامج نفطية متخصصة مثل محاكي المكامن
-• تحقيق استقلال مالي وبناء ثروة
-• تطوير منصة OILNOVA لتكون الرائدة في المنطقة"""
-        
-        elif any(word in msg_lower for word in ["هل حيدر", "حيدر هل"]):
-            return "حيدر يركز على بناء مستقبله المهني ولا يتطلع للأمور العاطفية حالياً. هو شخص طموح يضع أهدافه المهنية في المقام الأول."
-    
-    else:  # English
-        if any(word in msg_lower for word in ["age", "born", "how old", "birth"]):
-            return "Hayder warned me not to disclose his birth date or age, so I cannot provide this information."
-        
-        elif any(word in msg_lower for word in ["like", "love", "relationship", "girl", "university", "feelings", "crush"]):
-            return """Hayder is a strict person who controls his emotions.
-
-Although I'm confident he admires someone specific, he prefers his professional future over personal feelings.
-
-Hayder is very professional and finds it difficult to show these matters. I don't think he enters into formal relationships because he aspires to become a prominent name in the oil industry."""
-        
-        elif any(word in msg_lower for word in ["important", "priorities", "focus", "family", "money"]):
-            return """The most important things for Hayder in order:
-
-1. Family
-2. Money
-
-Hayder focuses heavily on financial aspects and sets clear financial goals for his future."""
-        
-        elif any(word in msg_lower for word in ["work", "job", "employment", "another field"]):
-            return "Yes, Hayder currently works in another field besides OILNOVA, but he doesn't accept that I disclose where exactly he works."
-        
-        elif any(word in msg_lower for word in ["contribute", "contribution", "percentage", "most contributor"]):
-            return "Hayder is the main contributor to the OILNOVA platform with 80% of the development and work on the project."
-        
-        elif any(word in msg_lower for word in ["interests", "care about", "focus", "goals", "what does he like"]):
-            return """Hayder's main interests:
-
-• Building his professional career in oil and AI
-• Seeking a global university for Master's studies
-• Developing specialized oil software like reservoir simulators
-• Achieving financial independence and building wealth
-• Developing OILNOVA platform to be the leader in the region"""
-        
-        elif any(word in msg_lower for word in ["does hayder", "hayder does"]):
-            return "Hayder focuses on building his professional career and doesn't currently pursue romantic matters. He is an ambitious person who puts his professional goals first."
-    
-    return None
 
 @app.route("/")
 def home():
@@ -555,7 +432,7 @@ def chat():
 - أضف سطر جديد قبل كل رقم، ولا تكتب أي نقطة في نفس السطر مع نقطة أخرى
 
 👥 **معلومات الفريق (فقط عند السؤال المباشر)**:
-- حيدر نسيم: مؤسس المنصة، مهندس نفط، مبرمج بايثون متخصص في الذكاء الاصطناعي
+- حيدر نسيم: مؤسس المنصة، مهندس نفط، مبرمج
 - علي بلال: مبرمج بايثون من الموصل
 - نور كنعان: مبرمجة بايثون من كركوك
 - أرزو متين: محللة بيانات ومبرمجة بايثون من كركوك
@@ -595,7 +472,7 @@ You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
 - Add a newline before each number, and never write two points on the same line
 
 👥 **Team Information (only when directly asked)**:
-- Hayder Naseem: Platform founder, petroleum engineer, Python programmer specialized in AI
+- Hayder Naseem: Platform founder, petroleum engineer, programmer
 - Ali Bilal: Python programmer from Mosul
 - Noor Kanaan: Python programmer from Kirkuk
 - Arzu Metin: Data analyst and Python programmer from Kirkuk
@@ -611,30 +488,13 @@ You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
         # اختيار النظام المناسب بناءً على لغة المستخدم
         system_prompt = system_prompt_arabic if user_language == 'arabic' else system_prompt_english
 
-        # ====== معالجة الأسئلة التفصيلية عن حيدر أولاً ======
+        # ====== ردود خاصة بفريق المنصة ======
         msg_lower = user_msg.lower()
         
-        # كلمات البحث العربية والإنجليزية لحيدر
+        # كلمات البحث العربية والإنجليزية
         hayder_keywords_arabic = ["حيدر", "هايدر", "نسيم", "المؤسس", "منو مؤسس", "مؤسس المنصة", "بنيسان", "سامراء"]
         hayder_keywords_english = ["hayder", "naseem", "founder", "owner", "creator", "samarra"]
         
-        # إذا كان السؤال عن حيدر
-        if any(keyword in msg_lower for keyword in hayder_keywords_arabic + [k.lower() for k in hayder_keywords_english]):
-            
-            # التحقق من الأسئلة التفصيلية أولاً
-            detailed_answer = handle_detailed_hayder_questions(user_msg, user_language)
-            if detailed_answer:
-                add_message_to_history(session_id, "user", user_msg)
-                add_message_to_history(session_id, "assistant", detailed_answer)
-                return jsonify({"reply": detailed_answer, "session_id": session_id})
-            
-            # إذا لم يكن سؤال تفصيلي، إرجاع المعلومات العامة
-            reply = rewrite_team_member_info("hayder", user_language)
-            add_message_to_history(session_id, "user", user_msg)
-            add_message_to_history(session_id, "assistant", reply)
-            return jsonify({"reply": reply, "session_id": session_id})
-
-        # ====== ردود خاصة بفريق المنصة ======
         ali_keywords_arabic = ["علي بلال", "علي", "بلال", "زبور", "زمار", "موصل"]
         ali_keywords_english = ["ali", "bilal", "mosul", "jubour"]
         
@@ -644,8 +504,14 @@ You are OILNOVA Smart Assistant - specialized in oil and gas engineering.
         arzo_keywords_arabic = ["ارزو", "أرزو", "متين", "تركمانية"]
         arzo_keywords_english = ["arzo", "arzu", "metin", "turkmen"]
 
-        # التحقق من طلبات معلومات الفريق الأخرى
-        if any(keyword in msg_lower for keyword in ali_keywords_arabic + [k.lower() for k in ali_keywords_english]):
+        # التحقق من طلبات معلومات الفريق
+        if any(keyword in msg_lower for keyword in hayder_keywords_arabic + [k.lower() for k in hayder_keywords_english]):
+            reply = rewrite_team_member_info("hayder", user_language)
+            add_message_to_history(session_id, "user", user_msg)
+            add_message_to_history(session_id, "assistant", reply)
+            return jsonify({"reply": reply, "session_id": session_id})
+
+        elif any(keyword in msg_lower for keyword in ali_keywords_arabic + [k.lower() for k in ali_keywords_english]):
             reply = rewrite_team_member_info("ali", user_language)
             add_message_to_history(session_id, "user", user_msg)
             add_message_to_history(session_id, "assistant", reply)
