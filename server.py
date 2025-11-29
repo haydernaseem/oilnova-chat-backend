@@ -175,46 +175,51 @@ def convert_english_numbers_to_arabic(text):
 
 def enforce_list_formatting(text, language):
     """تطبيق التنسيق الإجباري للقوائم - كل نقطة في سطر مستقل"""
+    if not text:
+        return text
     
     # أنماط للتعرف على القوائم المرقمة والنقطية
-    numbered_pattern = r'(\d+\.\s*[^\n]+)'
-    bullet_pattern = r'([•\-*]\s*[^\n]+)'
+    numbered_pattern = r'(\d+\.\s*[^\n]+(?:\s*\d+\.\s*[^\n]+)*)'
+    bullet_pattern = r'([•\-*]\s*[^\n]+(?:\s*[•\-*]\s*[^\n]+)*)'
     
-    # معالجة القوائم المرقمة
-    def format_numbered_list(match):
-        items = match.group(0).strip().split('\n')
-        formatted_items = []
-        
-        for item in items:
-            item = item.strip()
-            if re.match(r'^\d+\.', item):
+    def format_lists(text):
+        # معالجة القوائم المرقمة
+        def format_numbered(match):
+            content = match.group(0).strip()
+            # تقسيم إلى عناصر فردية
+            items = re.findall(r'\d+\.\s*[^\n]+', content)
+            formatted_items = []
+            for item in items:
+                item = item.strip()
                 # إضافة سطر جديد قبل كل نقطة مرقمة
                 formatted_items.append('\n' + item)
-            else:
-                formatted_items.append(item)
+            return ''.join(formatted_items).strip()
         
-        return ''.join(formatted_items).strip()
-    
-    # معالجة القوائم النقطية
-    def format_bullet_list(match):
-        items = match.group(0).strip().split('\n')
-        formatted_items = []
-        
-        for item in items:
-            item = item.strip()
-            if re.match(r'^[•\-*]', item):
+        # معالجة القوائم النقطية
+        def format_bullet(match):
+            content = match.group(0).strip()
+            # تقسيم إلى عناصر فردية
+            items = re.findall(r'[•\-*]\s*[^\n]+', content)
+            formatted_items = []
+            for item in items:
+                item = item.strip()
                 # إضافة سطر جديد قبل كل نقطة
                 formatted_items.append('\n' + item)
-            else:
-                formatted_items.append(item)
+            return ''.join(formatted_items).strip()
         
-        return ''.join(formatted_items).strip()
+        # تطبيق التنسيق على القوائم المرقمة
+        text = re.sub(numbered_pattern, format_numbered, text, flags=re.MULTILINE | re.DOTALL)
+        
+        # تطبيق التنسيق على القوائم النقطية
+        text = re.sub(bullet_pattern, format_bullet, text, flags=re.MULTILINE | re.DOTALL)
+        
+        return text
     
-    # تطبيق التنسيق على القوائم المرقمة
-    text = re.sub(numbered_pattern, format_numbered_list, text, flags=re.MULTILINE | re.DOTALL)
-    
-    # تطبيق التنسيق على القوائم النقطية
-    text = re.sub(bullet_pattern, format_bullet_list, text, flags=re.MULTILINE | re.DOTALL)
+    # تطبيق التنسيق بشكل متكرر لضمان معالجة جميع القوائم
+    previous_text = ""
+    while text != previous_text:
+        previous_text = text
+        text = format_lists(text)
     
     # تنظيف المسافات الزائدة بين الأسطر
     text = re.sub(r'\n\s*\n', '\n\n', text)
@@ -223,6 +228,9 @@ def enforce_list_formatting(text, language):
 
 def bold_important_words(text):
     """إضافة تنسيق Bold للكلمات المهمة تلقائياً"""
+    if not text:
+        return text
+    
     # الكلمات المهمة بالعربية والإنجليزية
     important_words = [
         'مهم', 'ملاحظة', 'تنبيه', 'Important', 'Note', 'Warning'
@@ -233,11 +241,19 @@ def bold_important_words(text):
         pattern = rf'\b{re.escape(word)}\s*:'
         replacement = f'**{word}:**'
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        
+        # أيضًا معالجتها إذا كانت في بداية السطر
+        pattern_start = rf'^\s*{re.escape(word)}\s*:'
+        replacement_start = f'**{word}:**'
+        text = re.sub(pattern_start, replacement_start, text, flags=re.IGNORECASE | re.MULTILINE)
     
     return text
 
 def format_arabic_text(text):
     """تنسيق النص العربي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    if not text:
+        return text
+    
     # تحويل الأرقام أولاً
     text = convert_english_numbers_to_arabic(text)
     
@@ -277,6 +293,9 @@ def format_arabic_text(text):
 
 def format_english_text(text):
     """تنسيق النص الإنجليزي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
+    if not text:
+        return text
+    
     # تطبيق التنسيق الإجباري للقوائم أولاً
     text = enforce_list_formatting(text, 'english')
     
