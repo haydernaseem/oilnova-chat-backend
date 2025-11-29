@@ -221,6 +221,21 @@ def enforce_list_formatting(text, language):
     
     return text.strip()
 
+def bold_important_words(text):
+    """إضافة تنسيق Bold للكلمات المهمة تلقائياً"""
+    # الكلمات المهمة بالعربية والإنجليزية
+    important_words = [
+        'مهم', 'ملاحظة', 'تنبيه', 'Important', 'Note', 'Warning'
+    ]
+    
+    for word in important_words:
+        # البحث عن الكلمة متبوعة بنقطتين مع مسافات محتملة
+        pattern = rf'\b{re.escape(word)}\s*:'
+        replacement = f'**{word}:**'
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    
+    return text
+
 def format_arabic_text(text):
     """تنسيق النص العربي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
     # تحويل الأرقام أولاً
@@ -228,6 +243,9 @@ def format_arabic_text(text):
     
     # تطبيق التنسيق الإجباري للقوائم
     text = enforce_list_formatting(text, 'arabic')
+    
+    # إضافة تنسيق Bold للكلمات المهمة
+    text = bold_important_words(text)
     
     lines = text.split('\n')
     formatted_lines = []
@@ -261,6 +279,9 @@ def format_english_text(text):
     """تنسيق النص الإنجليزي بشكل احترافي مع الالتزام بالتنسيق الإجباري"""
     # تطبيق التنسيق الإجباري للقوائم أولاً
     text = enforce_list_formatting(text, 'english')
+    
+    # إضافة تنسيق Bold للكلمات المهمة
+    text = bold_important_words(text)
     
     lines = text.split('\n')
     formatted_lines = []
