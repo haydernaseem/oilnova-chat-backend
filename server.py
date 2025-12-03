@@ -11,7 +11,7 @@ app = Flask(__name__)
 # ====== CORS FIX 100% ======
 CORS(app, resources={
     r"/*": {
-        "origins": ["https://petroai-iq.web.app", "*"],
+        "origins": ["https://petroai-iq.web.app","https://ping-pkai.onrender.com" ,"*"],
         "methods": ["POST", "GET", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
